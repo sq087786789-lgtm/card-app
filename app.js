@@ -150,6 +150,60 @@
     }
   }
 
+  // LLM Vision API OCR（呼叫後端）
+  async function runOCRviaAPI(file) {
+    const status = document.getElementById('ocrStatus');
+    const statusText = document.getElementById('ocrText');
+    const apiUrl = getSetting('apiUrl');
+
+    if (!apiUrl) {
+      throw new Error('請先在「設定」裡填入後端 API URL');
+    }
+
+    status.classList.remove('hidden');
+    statusText.textContent = '上傳到後端...';
+
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const r = await fetch(apiUrl.replace(/\/$/, '') + '/ocr', {
+        method: 'POST',
+        body: fd
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${r.status}`);
+      }
+      const data = await r.json();
+      status.classList.add('hidden');
+      return data;
+    } catch (err) {
+      status.classList.add('hidden');
+      throw err;
+    }
+  }
+
+  // 智能派工：依設定選擇引擎，API 失敗自動 fallback 到 Tesseract
+  async function smartOCR(file) {
+    const engine = getSetting('engine');
+    if (engine === 'api') {
+      try {
+        const result = await runOCRviaAPI(file);
+        return { source: 'api', ...result };
+      } catch (err) {
+        if (confirm(`LLM Vision 失敗：${err.message}\n\n要改用 Tesseract 離線辨識嗎？`)) {
+          const text = await runOCR(file);
+          const parsed = parseCardText(text);
+          return { source: 'tesseract', ...parsed };
+        }
+        throw err;
+      }
+    }
+    const text = await runOCR(file);
+    const parsed = parseCardText(text);
+    return { source: 'tesseract', ...parsed };
+  }
+
   // ---------- 表單 ----------
   const form = document.getElementById('cardForm');
   const editPanel = document.getElementById('editPanel');
@@ -205,9 +259,8 @@
     reader.onload = async e => {
       const dataUrl = e.target.result;
       try {
-        const text = await runOCR(file);
-        const parsed = parseCardText(text);
-        showEdit({ ...parsed, rawText: text }, dataUrl);
+        const result = await smartOCR(file);
+        showEdit({ ...result, rawText: result.rawText || '' }, dataUrl);
       } catch {
         showEdit(null, dataUrl);
       }
@@ -217,6 +270,85 @@
 
   document.getElementById('cameraInput').addEventListener('change', e => handleImage(e.target.files[0]));
   document.getElementById('fileInput').addEventListener('change', e => handleImage(e.target.files[0]));
+
+  // ---------- 設定（localStorage） ----------
+  const SETTINGS_KEY = 'card-app-settings';
+  const DEFAULT_SETTINGS = { engine: 'tesseract', apiUrl: '' };
+
+  function getSetting(key) {
+    try {
+      const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+      return s[key] !== undefined ? s[key] : DEFAULT_SETTINGS[key];
+    } catch { return DEFAULT_SETTINGS[key]; }
+  }
+
+  function setSetting(key, val) {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    s[key] = val;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  }
+
+  // 設定 Modal
+  const settingsModal = document.getElementById('settingsModal');
+  const engineSelect = document.getElementById('engineSelect');
+  const apiSettings = document.getElementById('apiSettings');
+  const apiUrlInput = document.getElementById('apiUrl');
+
+  function openSettings() {
+    engineSelect.value = getSetting('engine');
+    apiUrlInput.value = getSetting('apiUrl');
+    apiSettings.classList.toggle('hidden', engineSelect.value !== 'api');
+    document.getElementById('apiTestResult').textContent = '';
+    settingsModal.classList.remove('hidden');
+  }
+
+  function closeSettings() { settingsModal.classList.add('hidden'); }
+
+  document.getElementById('btnSettings').addEventListener('click', openSettings);
+  document.getElementById('settingsClose').addEventListener('click', closeSettings);
+  settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettings(); });
+
+  engineSelect.addEventListener('change', () => {
+    setSetting('engine', engineSelect.value);
+    apiSettings.classList.toggle('hidden', engineSelect.value !== 'api');
+  });
+
+  apiUrlInput.addEventListener('change', () => setSetting('apiUrl', apiUrlInput.value.trim()));
+
+  document.getElementById('btnTestApi').addEventListener('click', async () => {
+    const out = document.getElementById('apiTestResult');
+    const url = apiUrlInput.value.trim();
+    if (!url) { out.textContent = '❌ 請填 URL'; out.style.color = 'var(--danger)'; return; }
+    out.textContent = '⏳ 測試中...'; out.style.color = 'var(--muted)';
+    try {
+      const r = await fetch(url.replace(/\/$/, '') + '/health');
+      const d = await r.json();
+      if (d.ok) {
+        out.textContent = `✓ 連線 OK (API key ${d.hasKey ? '已設定' : '⚠️ 未設定'})`;
+        out.style.color = d.hasKey ? 'var(--primary)' : 'var(--danger)';
+      } else {
+        out.textContent = '❌ 回應異常'; out.style.color = 'var(--danger)';
+      }
+    } catch (err) {
+      out.textContent = `❌ 連線失敗：${err.message}`; out.style.color = 'var(--danger)';
+    }
+  });
+
+  document.getElementById('btnClearAll').addEventListener('click', async () => {
+    if (!confirm('真的要清空所有名片？此動作無法復原。')) return;
+    const tx = db.transaction(STORE, 'readwrite').objectStore(STORE);
+    await new Promise((res, rej) => {
+      const r = tx.clear();
+      r.onsuccess = res; r.onerror = rej;
+    });
+    closeSettings();
+    await refresh();
+  });
+
+  document.getElementById('btnExport2').addEventListener('click', () => {
+    closeSettings();
+    document.getElementById('btnExport').click();
+  });
 
   // ---------- 列表 + 搜尋 ----------
   const listEl = document.getElementById('cardList');

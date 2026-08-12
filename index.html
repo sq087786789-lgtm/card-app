@@ -16,10 +16,50 @@
   <header class="topbar">
     <h1>名片管家</h1>
     <div class="topbar-actions">
+      <button id="btnSettings" class="icon-btn" title="設定">⚙️</button>
       <button id="btnImport" class="icon-btn" title="匯入 vCard">📥</button>
       <button id="btnExport" class="icon-btn" title="匯出 vCard">📤</button>
     </div>
   </header>
+
+  <!-- 設定 Modal -->
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content" style="max-width:480px;border-radius:16px">
+      <button class="modal-close" id="settingsClose">✕</button>
+      <h2 style="margin:0 0 16px">設定</h2>
+
+      <div class="setting-row">
+        <label style="font-weight:600;font-size:14px">OCR 引擎</label>
+        <select id="engineSelect" style="width:100%;padding:10px;font-size:15px;border:1px solid var(--border);border-radius:8px;margin-top:6px">
+          <option value="tesseract">Tesseract（離線、免費、中文 60-70%）</option>
+          <option value="api">LLM Vision（最準、需 API、付費）</option>
+        </select>
+      </div>
+
+      <div id="apiSettings" class="setting-row hidden">
+        <label style="font-weight:600;font-size:14px">後端 API URL</label>
+        <input id="apiUrl" type="url" placeholder="https://your-app.up.railway.app" style="width:100%;padding:10px;font-size:15px;border:1px solid var(--border);border-radius:8px;margin-top:6px" />
+        <p style="font-size:12px;color:var(--muted);margin:6px 0 0">
+          圖片會送到這個後端，由它呼叫 LLM Vision API。<br>
+          後端程式碼在 repo 的 <code>server/</code> 目錄。
+        </p>
+        <button id="btnTestApi" type="button" class="secondary-btn" style="margin-top:10px;width:100%">🧪 測試連線</button>
+        <p id="apiTestResult" style="font-size:12px;margin:8px 0 0"></p>
+      </div>
+
+      <div class="setting-row">
+        <label style="font-weight:600;font-size:14px">資料</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
+          <button id="btnClearAll" type="button" class="danger-btn" style="padding:10px;border-radius:8px">🗑️ 清空全部名片</button>
+          <button id="btnExport2" type="button" class="secondary-btn" style="padding:10px;border-radius:8px">📤 匯出 vCard</button>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;font-size:12px;color:var(--muted);text-align:center">
+        v1.1 · 資料存本機 IndexedDB
+      </div>
+    </div>
+  </div>
 
   <main>
     <!-- 搜尋列 -->

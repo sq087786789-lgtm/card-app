@@ -196,3 +196,8 @@ main { padding: 12px 16px; max-width: 720px; margin: 0 auto; }
   border: 1px solid var(--danger);
 }
 .danger-btn:active { background: #fee2e2; }
+
+/* Settings */
+.setting-row { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.setting-row:last-of-type { border-bottom: none; }
+.modal-content select { font-family: inherit; background: white; }
