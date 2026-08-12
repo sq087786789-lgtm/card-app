@@ -482,6 +482,68 @@
     document.getElementById('vcfImportInput').click();
   });
 
+  // ---------- 雲端同步（讀 cards.json） ----------
+  // GitHub Pages 同網域，直接 fetch ./cards.json
+  // 策略：用 phone+email 當唯一鍵，重複就跳過；新卡片才寫入
+  const CLOUD_URL = './cards.json';
+  let lastSync = null;
+
+  async function syncFromCloud() {
+    const status = document.getElementById('syncStatus');
+    const icon = document.getElementById('syncIcon');
+    const text = document.getElementById('syncText');
+    status.classList.remove('hidden', 'error');
+    icon.classList.add('spin');
+    text.textContent = '同步雲端名片中...';
+
+    try {
+      // 加時間戳避免快取
+      const url = CLOUD_URL + '?t=' + Date.now();
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+
+      if (!data.cards || !Array.isArray(data.cards)) throw new Error('格式錯誤');
+
+      // 去重：phone + email 為唯一鍵
+      const existing = await dbAll();
+      const keySet = new Set(existing.map(c => cardKey(c)));
+
+      let added = 0, skipped = 0;
+      for (const card of data.cards) {
+        const k = cardKey(card);
+        if (keySet.has(k)) { skipped++; continue; }
+        await dbPut({
+          ...card,
+          createdAt: card.createdAt ? new Date(card.createdAt).getTime() : Date.now(),
+          source: card.source || 'cloud'
+        });
+        keySet.add(k);
+        added++;
+      }
+
+      lastSync = Date.now();
+      icon.classList.remove('spin');
+      const ts = new Date(data.updatedAt || Date.now()).toLocaleString('zh-TW');
+      text.textContent = `✓ 已同步 ${ts} · 新增 ${added} 張（略過 ${skipped} 張重複）`;
+      setTimeout(() => status.classList.add('hidden'), 4000);
+      await refresh();
+    } catch (err) {
+      console.error('sync failed', err);
+      icon.classList.remove('spin');
+      status.classList.add('error');
+      text.textContent = '❌ 同步失敗：' + err.message;
+      setTimeout(() => status.classList.add('hidden'), 6000);
+    }
+  }
+
+  function cardKey(c) {
+    return [c.phone, c.email].filter(Boolean).join('|') || ('name:' + (c.name || '') + '|company:' + (c.company || ''));
+  }
+
+  document.getElementById('btnSync').addEventListener('click', syncFromCloud);
+
+  // vCard 匯入 handler
   document.getElementById('vcfImportInput').addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -493,6 +555,77 @@
     alert(`匯入 ${cards.length} 張名片`);
     await refresh();
     e.target.value = '';
+  });
+
+  // OCR 結果匯入：M3 產出的 .json（單檔或多選）
+  document.getElementById('btnImportOCR').addEventListener('click', () => {
+    document.getElementById('ocrImportInput').click();
+  });
+
+  document.getElementById('ocrImportInput').addEventListener('change', async e => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const status = document.getElementById('ocrStatus');
+    const statusText = document.getElementById('ocrText');
+    status.classList.remove('hidden');
+
+    let imported = 0, skipped = 0;
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      statusText.textContent = `匯入 ${i + 1}/${files.length}: ${f.name}`;
+      try {
+        const text = await f.text();
+        const data = JSON.parse(text);
+
+        // 容錯：支援兩種格式
+        // 格式 A：{ source, name, company, ... } 單張
+        // 格式 B：{ cards: [ {...}, ... ] } 多張
+        const cards = Array.isArray(data.cards) ? data.cards : [data];
+
+        for (const card of cards) {
+          // 找對應的同名 .jpg/.png 作為縮圖
+          const baseName = f.name.replace(/\.json$/i, '');
+          let imageDataUrl = card.image || '';
+          if (!imageDataUrl) {
+            // 嘗試讀 inbox 但 PWA 不能讀本地檔，跳過
+          }
+
+          // 跳過空資料
+          if (!card.name && !card.company && !card.phone && !card.email) {
+            skipped++;
+            continue;
+          }
+
+          await dbPut({
+            name: card.name || '',
+            company: card.company || '',
+            title: card.title || '',
+            phone: card.phone || '',
+            email: card.email || '',
+            website: card.website || '',
+            address: card.address || '',
+            note: card.note || '',
+            rawText: card.rawText || '',
+            image: imageDataUrl,
+            source: card.source || 'm3-manual',
+            createdAt: card.createdAt || Date.now()
+          });
+          imported++;
+        }
+      } catch (err) {
+        console.error('OCR import failed', f.name, err);
+        skipped++;
+      }
+    }
+
+    status.classList.add('hidden');
+    e.target.value = '';
+    const msg = skipped > 0
+      ? `匯入 ${imported} 張名片（${skipped} 個失敗）`
+      : `匯入 ${imported} 張名片`;
+    alert(msg);
+    await refresh();
   });
 
   function parseVCards(text) {
@@ -533,5 +666,7 @@
   (async () => {
     db = await openDB();
     await refresh();
+    // 啟動時自動同步一次（背景執行，不打擾）
+    setTimeout(() => syncFromCloud().catch(() => {}), 1500);
   })();
 })();

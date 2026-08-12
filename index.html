@@ -17,6 +17,8 @@
     <h1>名片管家</h1>
     <div class="topbar-actions">
       <button id="btnSettings" class="icon-btn" title="設定">⚙️</button>
+      <button id="btnImportOCR" class="icon-btn" title="匯入 OCR 結果">📋</button>
+      <button id="btnSync" class="icon-btn" title="同步雲端名片">🔄</button>
       <button id="btnImport" class="icon-btn" title="匯入 vCard">📥</button>
       <button id="btnExport" class="icon-btn" title="匯出 vCard">📤</button>
     </div>
@@ -62,6 +64,12 @@
   </div>
 
   <main>
+    <!-- 同步狀態 -->
+    <div id="syncStatus" class="sync-status hidden">
+      <span id="syncIcon">🔄</span>
+      <span id="syncText">同步中...</span>
+    </div>
+
     <!-- 搜尋列 -->
     <section class="search-row">
       <input id="searchInput" type="search" placeholder="🔍 搜尋 姓名 / 公司 / 電話 / 信箱 / 備註..." autocomplete="off" />
@@ -133,6 +141,7 @@
   </div>
 
   <input id="vcfImportInput" type="file" accept=".vcf,text/vcard" hidden />
+  <input id="ocrImportInput" type="file" accept=".json,application/json" multiple hidden />
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js"></script>

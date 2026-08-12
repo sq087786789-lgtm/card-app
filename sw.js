@@ -1,11 +1,12 @@
 // Service Worker - 離線可用
-const CACHE = 'card-app-v1';
+const CACHE = 'card-app-v2';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './manifest.json',
+  './cards.json',
   './icons/icon-192.png'
 ];
 
