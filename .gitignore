@@ -10,3 +10,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# 工作目錄用的東西（不入 repo）
+inbox/
+ocr-batch.sh
+server/node_modules/
