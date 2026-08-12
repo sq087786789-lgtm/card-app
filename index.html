@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>名片管家</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>名片管家</h1>
+    <div class="topbar-actions">
+      <button id="btnImport" class="icon-btn" title="匯入 vCard">📥</button>
+      <button id="btnExport" class="icon-btn" title="匯出 vCard">📤</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 搜尋列 -->
+    <section class="search-row">
+      <input id="searchInput" type="search" placeholder="🔍 搜尋 姓名 / 公司 / 電話 / 信箱 / 備註..." autocomplete="off" />
+    </section>
+
+    <!-- 拍照/上傳 -->
+    <section class="actions-row">
+      <label for="cameraInput" class="primary-btn">
+        📷 拍名片
+        <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden />
+      </label>
+      <label for="fileInput" class="secondary-btn">
+        🖼️ 選圖片
+        <input id="fileInput" type="file" accept="image/*" hidden />
+      </label>
+    </section>
+
+    <!-- OCR 進度 -->
+    <div id="ocrStatus" class="ocr-status hidden">
+      <div class="spinner"></div>
+      <span id="ocrText">讀取中...</span>
+    </div>
+
+    <!-- 編輯表單（OCR 完成後出現） -->
+    <section id="editPanel" class="edit-panel hidden">
+      <h2 id="editTitle">新名片</h2>
+      <form id="cardForm">
+        <div class="preview-row">
+          <img id="cardImagePreview" alt="名片縮圖" />
+        </div>
+        <label>姓名 <input name="name" type="text" /></label>
+        <label>公司 <input name="company" type="text" /></label>
+        <label>職稱 <input name="title" type="text" /></label>
+        <label>電話 <input name="phone" type="tel" /></label>
+        <label>信箱 <input name="email" type="email" /></label>
+        <label>地址 <input name="address" type="text" /></label>
+        <label>網站 <input name="website" type="url" /></label>
+        <label>備註 <textarea name="note" rows="2"></textarea></label>
+
+        <!-- OCR 原始文字，可改可刪 -->
+        <details class="raw-text">
+          <summary>OCR 原始文字</summary>
+          <textarea name="rawText" rows="4" readonly></textarea>
+        </details>
+
+        <div class="form-actions">
+          <button type="button" id="btnCancel" class="secondary-btn">取消</button>
+          <button type="submit" class="primary-btn">💾 儲存</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 名片列表 -->
+    <section class="list-section">
+      <div class="list-header">
+        <h2 id="listTitle">名片列表 (0)</h2>
+      </div>
+      <ul id="cardList" class="card-list"></ul>
+      <p id="emptyHint" class="empty-hint">還沒有名片。點上方「拍名片」開始。</p>
+    </section>
+  </main>
+
+  <!-- 詳情 Modal -->
+  <div id="detailModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <button class="modal-close" id="modalClose">✕</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <input id="vcfImportInput" type="file" accept=".vcf,text/vcard" hidden />
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
