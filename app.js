@@ -38,7 +38,7 @@
 
   async function dbGet(id) {
     return new Promise((res, rej) => {
-      const r = tx('readonly').get(Number(id));
+      const r = tx('readonly').get(id);
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error);
     });
@@ -54,7 +54,7 @@
 
   async function dbDelete(id) {
     return new Promise((res, rej) => {
-      const r = tx('readwrite').delete(Number(id));
+      const r = tx('readwrite').delete(id);
       r.onsuccess = () => res();
       r.onerror = () => rej(r.error);
     });
@@ -406,18 +406,22 @@
   const modalBody = document.getElementById('modalBody');
 
   function openDetail(id) {
-    const card = allCards.find(c => c.id === id);
+    const card = allCards.find(c => String(c.id) === String(id));
     if (!card) return;
     modalBody.innerHTML = `
       ${card.image ? `<img src="${card.image}" style="width:100%;max-height:240px;object-fit:contain;border-radius:8px;margin-bottom:16px">` : ''}
       <h2 style="margin:0 0 16px">${escapeHtml(card.name || '(未命名)')}</h2>
       ${field('公司', card.company)}
+      ${field('公司（英文）', card.companyEn)}
       ${field('職稱', card.title)}
       ${field('電話', card.phone, c => c.phone && `<a href="tel:${c.phone}">${escapeHtml(c.phone)}</a>`)}
+      ${field('傳真', card.fax, c => c.fax && `<a href="tel:${c.fax}">${escapeHtml(c.fax)}</a>`)}
       ${field('信箱', card.email, c => c.email && `<a href="mailto:${c.email}">${escapeHtml(c.email)}</a>`)}
       ${field('網站', card.website, c => c.website && `<a href="${escapeHtml(c.website)}" target="_blank">${escapeHtml(c.website)}</a>`)}
       ${field('地址', card.address)}
+      ${field('LINE', card.line)}
       ${field('備註', card.note)}
+      ${card.rawText ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">OCR 原始文字</summary><pre style="white-space:pre-wrap;font-size:12px;background:#f8fafc;padding:8px;border-radius:6px;margin-top:6px">${escapeHtml(card.rawText)}</pre></details>` : ''}
       <div class="detail-actions">
         <button class="secondary-btn" id="btnEdit">✏️ 編輯</button>
         <button class="danger-btn" id="btnDelete">🗑️ 刪除</button>
