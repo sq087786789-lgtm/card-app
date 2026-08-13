@@ -395,7 +395,7 @@
     `).join('');
 
     listEl.querySelectorAll('.card-item').forEach(el => {
-      el.addEventListener('click', () => openDetail(Number(el.dataset.id)));
+      el.addEventListener('click', () => openDetail(el.dataset.id));
     });
   }
 
