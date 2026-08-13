@@ -1,5 +1,6 @@
 // 名片管家 — 主邏輯
-// IndexedDB + Tesseract.js OCR + 全文搜尋 + vCard 匯入/匯出
+// IndexedDB + 雲端 cards.json 同步 + 全文搜尋 + vCard 匯入/匯出
+// OCR 由 M3 在雲端處理（讀 inbox/ 圖 → 寫 cards.json → push）
 
 (() => {
   'use strict';
@@ -126,42 +127,19 @@
     return result;
   }
 
-  async function runOCR(file) {
-    const status = document.getElementById('ocrStatus');
-    const statusText = document.getElementById('ocrText');
-    status.classList.remove('hidden');
-
-    try {
-      statusText.textContent = '載入中文辨識引擎...';
-      const { data: { text } } = await Tesseract.recognize(file, 'chi_tra+eng', {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            statusText.textContent = `辨識中... ${Math.round(m.progress * 100)}%`;
-          }
-        }
-      });
-      status.classList.add('hidden');
-      return text;
-    } catch (err) {
-      status.classList.add('hidden');
-      console.error(err);
-      alert('OCR 失敗：' + err.message);
-      throw err;
-    }
-  }
-
-  // LLM Vision API OCR（呼叫後端）
-  async function runOCRviaAPI(file) {
-    const status = document.getElementById('ocrStatus');
-    const statusText = document.getElementById('ocrText');
+  // OCR：APP 內拍/選圖時呼叫
+  // 只有「設定 → 後端 API URL」填了才會自動 OCR
+  // 沒填的話：純拍照 + 手動填欄位（OCR 由 M3 在雲端處理後 push cards.json）
+  async function smartOCR(file) {
     const apiUrl = getSetting('apiUrl');
-
     if (!apiUrl) {
-      throw new Error('請先在「設定」裡填入後端 API URL');
+      throw new Error('未設定後端 API URL — 請把名片圖丟到 inbox/ 讓 M3 手動 OCR');
     }
 
+    const status = document.getElementById('ocrStatus');
+    const statusText = document.getElementById('ocrText');
     status.classList.remove('hidden');
-    statusText.textContent = '上傳到後端...';
+    statusText.textContent = '上傳到後端 OCR...';
 
     try {
       const fd = new FormData();
@@ -176,32 +154,11 @@
       }
       const data = await r.json();
       status.classList.add('hidden');
-      return data;
+      return { source: 'api', ...data };
     } catch (err) {
       status.classList.add('hidden');
       throw err;
     }
-  }
-
-  // 智能派工：依設定選擇引擎，API 失敗自動 fallback 到 Tesseract
-  async function smartOCR(file) {
-    const engine = getSetting('engine');
-    if (engine === 'api') {
-      try {
-        const result = await runOCRviaAPI(file);
-        return { source: 'api', ...result };
-      } catch (err) {
-        if (confirm(`LLM Vision 失敗：${err.message}\n\n要改用 Tesseract 離線辨識嗎？`)) {
-          const text = await runOCR(file);
-          const parsed = parseCardText(text);
-          return { source: 'tesseract', ...parsed };
-        }
-        throw err;
-      }
-    }
-    const text = await runOCR(file);
-    const parsed = parseCardText(text);
-    return { source: 'tesseract', ...parsed };
   }
 
   // ---------- 表單 ----------
@@ -273,7 +230,7 @@
 
   // ---------- 設定（localStorage） ----------
   const SETTINGS_KEY = 'card-app-settings';
-  const DEFAULT_SETTINGS = { engine: 'tesseract', apiUrl: '' };
+  const DEFAULT_SETTINGS = { apiUrl: '' };
 
   function getSetting(key) {
     try {
@@ -290,14 +247,12 @@
 
   // 設定 Modal
   const settingsModal = document.getElementById('settingsModal');
-  const engineSelect = document.getElementById('engineSelect');
   const apiSettings = document.getElementById('apiSettings');
   const apiUrlInput = document.getElementById('apiUrl');
 
   function openSettings() {
-    engineSelect.value = getSetting('engine');
     apiUrlInput.value = getSetting('apiUrl');
-    apiSettings.classList.toggle('hidden', engineSelect.value !== 'api');
+    apiSettings.classList.toggle('hidden', !apiUrlInput.value);
     document.getElementById('apiTestResult').textContent = '';
     settingsModal.classList.remove('hidden');
   }
@@ -308,9 +263,9 @@
   document.getElementById('settingsClose').addEventListener('click', closeSettings);
   settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettings(); });
 
-  engineSelect.addEventListener('change', () => {
-    setSetting('engine', engineSelect.value);
-    apiSettings.classList.toggle('hidden', engineSelect.value !== 'api');
+  apiUrlInput.addEventListener('change', () => {
+    setSetting('apiUrl', apiUrlInput.value.trim());
+    apiSettings.classList.toggle('hidden', !apiUrlInput.value.trim());
   });
 
   apiUrlInput.addEventListener('change', () => setSetting('apiUrl', apiUrlInput.value.trim()));

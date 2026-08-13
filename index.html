@@ -32,14 +32,17 @@
 
       <div class="setting-row">
         <label style="font-weight:600;font-size:14px">OCR 引擎</label>
-        <select id="engineSelect" style="width:100%;padding:10px;font-size:15px;border:1px solid var(--border);border-radius:8px;margin-top:6px">
-          <option value="tesseract">Tesseract（離線、免費、中文 60-70%）</option>
-          <option value="api">LLM Vision（最準、需 API、付費）</option>
-        </select>
+        <div style="padding:10px;background:#f1f5f9;border-radius:8px;margin-top:6px;font-size:14px;color:var(--muted)">
+          🤖 由 M3 人工 OCR（雲端同步）
+          <p style="font-size:12px;margin:6px 0 0">
+            把名片圖丟到 <code>inbox/</code>，跟 M3 說「OCR」即可。<br>
+            PWA 開啟時會自動從 GitHub 同步最新的 <code>cards.json</code>。
+          </p>
+        </div>
       </div>
 
       <div id="apiSettings" class="setting-row hidden">
-        <label style="font-weight:600;font-size:14px">後端 API URL</label>
+        <label style="font-weight:600;font-size:14px">後端 API URL <span style="color:var(--muted);font-weight:400">（選填，留空關閉）</span></label>
         <input id="apiUrl" type="url" placeholder="https://your-app.up.railway.app" style="width:100%;padding:10px;font-size:15px;border:1px solid var(--border);border-radius:8px;margin-top:6px" />
         <p style="font-size:12px;color:var(--muted);margin:6px 0 0">
           圖片會送到這個後端，由它呼叫 LLM Vision API。<br>
@@ -146,7 +149,6 @@
   <input id="vcfImportInput" type="file" accept=".vcf,text/vcard" hidden />
   <input id="ocrImportInput" type="file" accept=".json,application/json" multiple hidden />
 
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
