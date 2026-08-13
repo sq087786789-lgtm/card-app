@@ -215,8 +215,8 @@
     editingId = card ? card.id : null;
     editTitle.textContent = card ? '編輯名片' : '新名片';
     pendingImage = image;
-    document.getElementById('cardImagePreview').src = image || (card && card.image) || '';
-    const fields = ['name', 'company', 'title', 'phone', 'email', 'address', 'website', 'note', 'rawText'];
+    document.getElementById('cardImagePreview').src = image || (card && card.image ? resolveImage(card.image) : '');
+    const fields = ['name', 'company', 'companyEn', 'title', 'phone', 'fax', 'email', 'address', 'website', 'line', 'note', 'rawText'];
     for (const f of fields) {
       form.elements[f].value = card && card[f] ? card[f] : '';
     }
@@ -384,15 +384,20 @@
 
     listTitle.textContent = `名片列表 (${filtered.length})`;
     emptyHint.classList.toggle('hidden', filtered.length > 0);
-    listEl.innerHTML = filtered.map(c => `
+    listEl.innerHTML = filtered.map(c => {
+      const avatar = c.image
+        ? `<img class="card-thumb" src="${escapeHtml(resolveImage(c.image))}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;card-avatar&quot;>${escapeHtml((c.name || c.company || '?').slice(0, 1))}</div>'" />`
+        : `<div class="card-avatar">${escapeHtml((c.name || c.company || '?').slice(0, 1))}</div>`;
+      return `
       <li class="card-item" data-id="${c.id}">
-        <div class="card-avatar">${escapeHtml((c.name || c.company || '?').slice(0, 1))}</div>
+        ${avatar}
         <div class="card-info">
           <div class="card-name">${highlight(c.name || c.company || '(未命名)', q)}</div>
           <div class="card-meta">${highlight([c.company, c.title].filter(Boolean).join(' · ') || c.phone || c.email || '—', q)}</div>
         </div>
       </li>
-    `).join('');
+    `;
+    }).join('');
 
     listEl.querySelectorAll('.card-item').forEach(el => {
       el.addEventListener('click', () => openDetail(el.dataset.id));
@@ -409,7 +414,7 @@
     const card = allCards.find(c => String(c.id) === String(id));
     if (!card) return;
     modalBody.innerHTML = `
-      ${card.image ? `<img src="${card.image}" style="width:100%;max-height:240px;object-fit:contain;border-radius:8px;margin-bottom:16px">` : ''}
+      ${card.image ? `<img src="${escapeHtml(resolveImage(card.image))}" style="width:100%;max-height:240px;object-fit:contain;border-radius:8px;margin-bottom:16px" onerror="this.style.display='none'" />` : ''}
       <h2 style="margin:0 0 16px">${escapeHtml(card.name || '(未命名)')}</h2>
       ${field('公司', card.company)}
       ${field('公司（英文）', card.companyEn)}
@@ -543,6 +548,14 @@
 
   function cardKey(c) {
     return [c.phone, c.email].filter(Boolean).join('|') || ('name:' + (c.name || '') + '|company:' + (c.company || ''));
+  }
+
+  // 圖片路徑正規化：相對路徑 → 絕對 URL（GitHub Pages）
+  function resolveImage(path) {
+    if (!path) return '';
+    if (path.startsWith('http') || path.startsWith('data:')) return path;
+    // 相對路徑 → 用當前網域基底
+    return new URL(path, location.href).href;
   }
 
   document.getElementById('btnSync').addEventListener('click', syncFromCloud);

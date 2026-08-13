@@ -9,6 +9,7 @@ const ASSETS = [
   './cards.json',
   './icons/icon-192.png'
 ];
+// 注意：images/ 不預快取（圖太多），走 runtime cache
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
