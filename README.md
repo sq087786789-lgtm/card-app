@@ -1,43 +1,29 @@
-# 名片管家 CardApp
+# 我的名片：Google 個人版
 
-目前改版方向是 [全 Google 共用版](google/README.md)：Apps Script 執行網站、Sheets 保存共用資料、Drive 保存照片、Gemini 辨識。程式已實作，尚在部署與授權驗收階段，現有試用網址尚未切換。
+[開啟名片網站](https://sq087786789-lgtm.github.io/card-app/) · [直接進入私人名片庫](https://script.google.com/macros/s/AKfycbxW7uPyY5JyhaTZHYGPrg9z_OKdDaNAPYlXqPADlS95al-1PKyuP5YZZ7JS_2XW91qU/exec)
 
-> 新版「管理員與員工共用名片庫」位於 [v2/](v2/README.md)。新版包含可操作試用介面及 Google 登入／Drive／圖片辨識的伺服器程式；外部服務需完成設定與實測後才可正式使用。此處舊版繼續保留。
+目前使用 Google Apps Script 第 6 版，僅供管理員本人使用。Google 直接登入；Sheets 保存名片欄位，私人 Drive 保存正反面照片，Cloud Vision 讀取文字。使用方式：拍照或選圖 → 按辨識 → 核對欄位 → 儲存。
 
-拍照 → 自動 OCR 讀取 → 搜尋 → 匯出 vCard 的極簡名片管理 PWA。
+GitHub Pages 提供新版入口；私人資料與辨識 API 在 Google 執行，不在公開網站存放。完整 App 程式在 [google/](google/README.md)，憑證只在私人 Script Properties，沒有提交 GitHub。程式碼變更仍須另外部署 Apps Script，合併 GitHub 不會自動修改 Google 後端。
 
-## OCR 流程
+## 舊版撤下與資料保留
 
-由 M3 在雲端人工處理：
-1. 把拍好的名片圖丟到 `inbox/` 資料夾
-2. 跟 M3 說「OCR 這幾張」
-3. M3 產出 `card-XXX.json`（結構化）+ 複製圖到 `images/`
-4. M3 更新 `cards.json` + push 到 GitHub
-5. PWA 開啟時自動從 GitHub 同步
+舊版名片介面、人工 OCR 腳本、舊伺服器及公開 cards.json／images 已從目前版本撤下。舊 Git 版本可回復，沒有清除 Git 歷史。
 
-> 已移除 Tesseract.js 與 LLM Vision API 兩種自動引擎，純粹 M3 人工 OCR，準度最高、不用花 API 錢。
+原手機瀏覽器的 IndexedDB 名片不會被刪除。若尚未搬移，請在原手機開啟 [舊資料匯出](https://sq087786789-lgtm.github.io/card-app/data-recovery.html)，下載 JSON，再到 Google 版「更多 → 備份與匯入」匯入。匯出工具只讀本機資料及本 App 圖片快取，不上傳、同步或呼叫 OCR。沒有快取的舊網址照片需重新補上。
 
-## 功能
+sw.js 撤換舊快取優先程式，只刷新此名片網站，不清除 IndexedDB 或照片快取，也不影響同帳號的裝車助手等其他工具。舊手機主畫面圖示若仍顯示舊頁，連網重新開啟後會更新。
 
-- 📷 拍照 / 上傳（圖存手機，OCR 由雲端 M3 處理）
-- ✏️ 手動校正 + 儲存（任何時候都能編輯欄位）
-- 🔍 全文搜尋（命中 highlight）
-- 📥📤 vCard (.vcf) 匯入匯出，與手機通訊錄互通
-- 📱 PWA：可加到 iOS/Android 主畫面
-- 🔒 純前端，名片資料存 IndexedDB + GitHub 公開 cards.json
+## 辨識及用量
 
-## 本地開發
+Cloud Vision 的獨立金鑰只允許此 API，不回退 Gemini。App 採 900 張圖片／滾動 32 天上限，先持久預扣，失敗不自動重試；相同照片重用結果。此上限只管本 App，不涵蓋帳務內其他使用。沒有升級現有 Google Cloud 免費試用帳戶。詳見 [Vision 設定及驗證](google/VISION.md)。
 
-```bash
-python3 -m http.server 8765
-# 開 http://localhost:8765
-```
+## 維護與驗證
 
-## 部署
-
-GitHub Pages：`Settings → Pages → Source: main / root`
-網址：https://sq087786789-lgtm.github.io/card-app
-
-## License
+- `node google/test.mjs`：Google 個人版及 Vision 行為測試。
+- `node scripts/check-pages.mjs`：舊資料唯讀匯出與 Service Worker 更新範圍。
+- `node google/build.mjs`：由 v2/public 的共用介面元件建置 google/Index.html；此產物不進 Git。
+- v2/ 保留為建置來源及歷史實作，沒有新版網站入口；_config.yml 排除其 GitHub Pages 發布。
+- iPhone 相機／HEIC 及多 Google 帳號仍需實機驗收。不要將私人聯絡資料、照片備份或金鑰提交公開儲存庫。
 
 MIT

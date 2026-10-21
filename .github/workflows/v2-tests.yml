@@ -1,9 +1,9 @@
 name: Shared card library v2
 on:
   pull_request:
-    paths: ['v2/**', 'google/**', '.github/workflows/v2-tests.yml']
+    paths: ['v2/**', 'google/**', 'scripts/**', 'index.html', 'entry.js', 'data-recovery.*', 'sw.js', 'manifest.json', '_config.yml', '.github/workflows/v2-tests.yml']
   push:
-    paths: ['v2/**', 'google/**', '.github/workflows/v2-tests.yml']
+    paths: ['v2/**', 'google/**', 'scripts/**', 'index.html', 'entry.js', 'data-recovery.*', 'sw.js', 'manifest.json', '_config.yml', '.github/workflows/v2-tests.yml']
 permissions:
   contents: read
 jobs:
@@ -17,3 +17,4 @@ jobs:
       - run: npm test
         working-directory: v2
       - run: node google/test.mjs
+      - run: node scripts/check-pages.mjs
