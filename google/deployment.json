@@ -2,10 +2,10 @@
   "scriptId": "19h1ewm68Fdoj2E2iPWLV9WKlWoi8smwlvSe-UJfQRkW2gYRXCZeVQHCm",
   "editorUrl": "https://script.google.com/home/projects/19h1ewm68Fdoj2E2iPWLV9WKlWoi8smwlvSe-UJfQRkW2gYRXCZeVQHCm/edit",
   "ownerEmail": "sq087786789@gmail.com",
-  "status": "deployed-personal",
+  "status": "deployed-personal-cloud-vision",
   "access": "MYSELF",
   "authentication": "active-google-owner-only",
-  "webAppVersion": 5,
+  "webAppVersion": 6,
   "webAppUrl": "https://script.google.com/macros/s/AKfycbxW7uPyY5JyhaTZHYGPrg9z_OKdDaNAPYlXqPADlS95al-1PKyuP5YZZ7JS_2XW91qU/exec",
   "driveFolderId": "1YdYASlIb7gF7wMZUHMDUe4emqalJPcrN",
   "databaseId": "1XYOy1zWAILKHmgQKVvalL5u1gfE1MYMVSh5-LUejb8I",
@@ -21,13 +21,23 @@
     "personal-direct-entry-fresh-tab",
     "personal-existing-card-photo-display",
     "personal-card-write-readback",
-    "platform-owner-only"
+    "platform-owner-only",
+    "vision-restricted-key",
+    "vision-live-fictional-ocr",
+    "vision-save-readback",
+    "vision-image-cache-no-extra-unit"
   ],
-  "ocrProjectId": "gen-lang-client-0257505168",
-  "ocrModel": "gemini-3.5-flash-lite",
-  "ocrUsage": "fictional-test-cards-only",
+  "ocrProjectId": "card-library-sq087-20261021",
+  "ocrUsage": "owner-real-business-cards-on-demand",
   "pending": [
     "iphone-camera-heic",
     "iphone-multiple-google-accounts"
-  ]
+  ],
+  "ocrProvider": "Cloud Vision",
+  "ocrFeature": "DOCUMENT_TEXT_DETECTION",
+  "ocrLimit": {
+    "units": 900,
+    "rollingDays": 32,
+    "scope": "this-app-only"
+  }
 }
