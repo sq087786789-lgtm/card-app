@@ -11,7 +11,18 @@ replace(/async function api\(path,method='GET',data\)\{[\s\S]*?\n\}/,`async func
 }`);
 replace(/async function photoUrl\(id\)\{[^\n]+\}/,`async function photoUrl(id){if(!id)return '';if(!photoCache.has(id))photoCache.set(id,await api('/api/photos/'+id));return photoCache.get(id);}`);
 replace(/href="\/auth\/google"/,'href="#" id="googleSignIn"');
-replace(/\$\('#addCard'\)\.hidden=true;\}/,`const addButton=$('#addCard');if(addButton)addButton.hidden=true;$('#googleSignIn').onclick=signInGoogle;}`);
+replace(/shouldOCR=boot\.ocrReady;/,'shouldOCR=false;');
+replace(/async function ocr\(\)\{/,'async function ocr(){if(!confirm("目前為免費辨識驗證，Google 可能使用內容改善服務。請確認這是虛構測試名片，不含真實客戶個資，才繼續辨識。"))return;');
+app=app.replaceAll('選擇照片後，可辨識正反面的聯絡資訊。','免費辨識驗證僅限虛構名片。照片先保存，按辨識後才傳送 Google。');
+replace(/\$\('#addCard'\)\.hidden=true;\}/,`const addButton=$('#addCard');if(addButton)addButton.hidden=true;$('#logout').hidden=true;$('#googleSignIn').onclick=signInGoogle;}`);
+const signInMarkup=app.match(/\$\('main'\)\.innerHTML=('[^\n]*?');/)[1];
+replace(/\$\('main'\)\.innerHTML=('[^\n]*?');/,`$$('main > *').forEach(el=>el.hidden=true);$('.signin')?.remove();$('main').insertAdjacentHTML('beforeend',${signInMarkup});`);
+// Preserve the form DOM and handlers across sign-in: reloading Apps Script's sandbox turns it blank.
+app=app.replace('location.reload();',"cards=[];photoCache.clear();await startApp();");
+replace(/else\{\$\('#logout'\)\.hidden=local;await reload\(\);\}/,"else{$('#addCard').hidden=false;$('#libraryView').hidden=false;$('#managementView').hidden=true;$('#logout').hidden=local;notice($('#pageError'),'');await reload();}");
+const startIndex=app.lastIndexOf("try{boot=await api('/api/bootstrap')");
+if(startIndex<0)throw Error('Bootstrap source changed');
+app=app.slice(0,startIndex)+'async function startApp(){'+app.slice(startIndex)+'\n}\nawait startApp();';
 const driveStart=app.indexOf("    if(boot.mode==='shared'&&boot.user.role==='owner'){");
 const driveEnd=app.indexOf("\n  }else if(view==='members')",driveStart);
 if(driveStart<0||driveEnd<0)throw Error('Drive management block changed');
@@ -19,7 +30,7 @@ app=app.slice(0,driveStart)+`    if(boot.mode==='shared'&&boot.user.role==='owne
 app=app.replaceAll('公司共用資料庫；連接管理員 Drive 後，儲存名片會自動同步照片。','Google 試算表共用資料庫；照片直接存入管理員 Google Drive。').replaceAll('Google 登入、Drive','Google 登入、Drive').replaceAll('已設定，需實測','已設定').replaceAll('由管理員授權，在管理員雲端建立「公司名片庫」，員工不需登入管理員帳號。','照片直接保存至管理員的「公司名片庫」，員工透過 App 讀取，不共用管理員密碼。').replaceAll('資料庫與 Google Drive 照片是分開保存。Drive 照片同步不代表完整資料庫備份。','名片欄位保存在 Google 試算表，照片在 Drive。請定期下載包含文字與照片的完整備份。');
 const bridge=`
 function gasCall(name,args){return new Promise((resolve,reject)=>{const r=google.script.run.withSuccessHandler(result=>{if(!result?.ok){reject(Object.assign(new Error(result?.error||'Google 服務暫時無法完成操作。'),result));return;}resolve(result.data);}).withFailureHandler(()=>reject(new Error('無法連接 Google 共用服務，請重新整理後再試。')));if(name==='api')r.api(...args);else if(name==='beginLogin')r.beginLogin();else if(name==='pollLogin')r.pollLogin(...args);else reject(new Error('不支援的操作。'));});}
-async function signInGoogle(e){e.preventDefault();const link=e.currentTarget;let errorBox=$('#pageError');if(!errorBox){errorBox=document.createElement('p');errorBox.id='pageError';errorBox.setAttribute('role','alert');link.parentNode.append(errorBox);}try{link.textContent='正在準備登入…';const flow=await gasCall('beginLogin',[]);link.href=flow.url;link.target='_blank';link.rel='noopener';link.onclick=null;link.textContent='前往 Google 登入（開啟新分頁）';notice(errorBox,'登入完成後，請回到這個分頁。');const deadline=Date.now()+300000;while(Date.now()<deadline){await new Promise(r=>setTimeout(r,1800));const result=await gasCall('pollLogin',[flow.flow,flow.secret]);if(result.token){sessionStorage.setItem('card-session',result.token);location.reload();return;}}throw Error('登入逾時，請重新整理後再試。');}catch(err){link.removeAttribute('href');notice(errorBox,err.message,'error');}}
+async function signInGoogle(e){e.preventDefault();const link=e.currentTarget;let errorBox=$('#pageError');if(!errorBox){errorBox=document.createElement('p');errorBox.id='pageError';errorBox.setAttribute('role','alert');link.parentNode.append(errorBox);}try{link.textContent='正在準備登入…';const flow=await gasCall('beginLogin',[]);link.href=flow.url;link.target='_blank';link.rel='noopener';link.onclick=null;link.textContent='前往 Google 登入（開啟新分頁）';notice(errorBox,'登入完成後，請回到這個分頁。');const deadline=Date.now()+300000;while(Date.now()<deadline){await new Promise(r=>setTimeout(r,1800));const result=await gasCall('pollLogin',[flow.flow,flow.secret]);if(result.token){sessionStorage.setItem('card-session',result.token);link.closest('.signin').remove();$$('main > *').forEach(el=>el.hidden=false);await startApp();return;}}throw Error('登入逾時，請重新整理後再試。');}catch(err){link.removeAttribute('href');notice(errorBox,err.message,'error');}}
 `;
 let model=(await read('../v2/public/model.js')).replace(/^export /gm,'');
 let html=await read('../v2/public/index.html');
