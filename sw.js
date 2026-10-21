@@ -5,7 +5,8 @@ self.addEventListener('activate',event=>{event.waitUntil((async()=>{
   const entry=new URL('./',self.registration.scope);
   for(const client of await self.clients.matchAll({type:'window',includeUncontrolled:true})){
     const url=new URL(client.url);
-    if(url.origin===entry.origin&&(url.pathname===entry.pathname||url.pathname===entry.pathname+'index.html'))await client.navigate(entry.href);
+    // Navigation can wait for activation. Never await it inside activate.waitUntil.
+    if(url.origin===entry.origin&&(url.pathname===entry.pathname||url.pathname===entry.pathname+'index.html'))client.navigate(entry.href).catch(()=>{});
   }
 })());});
 // No cache-first fetch handler: future navigation always loads the current entry.
