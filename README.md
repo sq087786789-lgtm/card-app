@@ -1,5 +1,7 @@
 # 名片管家 CardApp
 
+目前改版方向是 [全 Google 共用版](google/README.md)：Apps Script 執行網站、Sheets 保存共用資料、Drive 保存照片、Gemini 辨識。程式已實作，尚在部署與授權驗收階段，現有試用網址尚未切換。
+
 > 新版「管理員與員工共用名片庫」位於 [v2/](v2/README.md)。新版包含可操作試用介面及 Google 登入／Drive／圖片辨識的伺服器程式；外部服務需完成設定與實測後才可正式使用。此處舊版繼續保留。
 
 拍照 → 自動 OCR 讀取 → 搜尋 → 匯出 vCard 的極簡名片管理 PWA。
