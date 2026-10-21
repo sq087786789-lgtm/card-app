@@ -1,37 +1,11 @@
-// Service Worker - 離線可用
-const CACHE = 'card-app-v5-zh-guide';
-const ASSETS = [
-  './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './manifest.json',
-  './cards.json',
-  './icons/icon-192.png'
-];
-// 注意：images/ 不預快取（圖太多），走 runtime cache
-
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-  ));
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(cached =>
-      cached || fetch(e.request).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
-        return res;
-      }).catch(() => caches.match('./index.html'))
-    )
-  );
-});
+// Retire the former offline app. Leave its local database and image caches intact.
+self.addEventListener('install',event=>{event.waitUntil(self.skipWaiting());});
+self.addEventListener('activate',event=>{event.waitUntil((async()=>{
+  await self.clients.claim();
+  const entry=new URL('./',self.registration.scope);
+  for(const client of await self.clients.matchAll({type:'window',includeUncontrolled:true})){
+    const url=new URL(client.url);
+    if(url.origin===entry.origin&&(url.pathname===entry.pathname||url.pathname===entry.pathname+'index.html'))await client.navigate(entry.href);
+  }
+})());});
+// No cache-first fetch handler: future navigation always loads the current entry.

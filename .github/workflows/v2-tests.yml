@@ -1,0 +1,20 @@
+name: Shared card library v2
+on:
+  pull_request:
+    paths: ['v2/**', 'google/**', 'scripts/**', 'index.html', 'entry.js', 'data-recovery.*', 'sw.js', 'manifest.json', '_config.yml', '.github/workflows/v2-tests.yml']
+  push:
+    paths: ['v2/**', 'google/**', 'scripts/**', 'index.html', 'entry.js', 'data-recovery.*', 'sw.js', 'manifest.json', '_config.yml', '.github/workflows/v2-tests.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm test
+        working-directory: v2
+      - run: node google/test.mjs
+      - run: node scripts/check-pages.mjs

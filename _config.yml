@@ -1,0 +1,10 @@
+# Publish the entry and local recovery tool, not inactive app implementations.
+exclude:
+  - google
+  - v2
+  - server
+  - scripts
+  - README.md
+  - railway.json
+  - cards.json
+  - images
