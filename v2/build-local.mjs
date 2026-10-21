@@ -1,0 +1,11 @@
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {dirname,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+const base=dirname(fileURLToPath(import.meta.url));
+const read=name=>readFile(resolve(base,'public',name),'utf8');
+let html=await read('index.html');
+const modules=await Promise.all(['model.js','demo.js','app.js'].map(read));
+const js=modules.map(s=>s.replace(/^import .*\r?\n/gm,'').replace(/^export /gm,'')).join('\n').replace("const demo=browserDemo ? (await import('./demo.js')).demoApi : null;",'const demo=browserDemo ? demoApi : null;');
+const css=await read('style.css');
+html=html.replace('<link rel="stylesheet" href="./style.css">',()=>'<style>'+css+'</style>').replace('<script type="module" src="./app.js"></script>',()=>'<script type="module">'+js.replaceAll('</script','<\\/script')+'</script>');
+const output=resolve(process.argv[2]||resolve(base,'dist','名片共用庫-本機試用.html'));await mkdir(dirname(output),{recursive:true});await writeFile(output,html);console.log(output);
