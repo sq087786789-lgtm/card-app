@@ -23,7 +23,7 @@ Cloud Vision 的獨立金鑰只允許此 API，不回退 Gemini。App 採 900 �
 - `node google/test.mjs`：Google 個人版及 Vision 行為測試。
 - `node scripts/check-pages.mjs`：舊資料唯讀匯出與 Service Worker 更新範圍。
 - `node google/build.mjs`：由 v2/public 的共用介面元件建置 google/Index.html；此產物不進 Git。
-- v2/ 保留為建置來源及歷史實作，沒有新版網站入口；_config.yml 排除其 GitHub Pages 發布。
+- v2/ 保留為建置來源及歷史實作，沒有新版網站入口。GitHub Pages 由 .github/workflows/pages.yml 發布；scripts/build-pages.mjs 僅打包入口、唯讀匯出頁、更新腳本與圖示，不發布 google/、v2/ 或資料檔。_config.yml 另保留分支發布時的排除設定。
 - iPhone 相機／HEIC 及多 Google 帳號仍需實機驗收。不要將私人聯絡資料、照片備份或金鑰提交公開儲存庫。
 
 MIT

@@ -1,0 +1,11 @@
+import {mkdir,copyFile,writeFile} from 'node:fs/promises';
+import {existsSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+const root=fileURLToPath(new URL('../',import.meta.url)),out=path.join(root,'_site');
+if(existsSync(out))throw new Error('_site 已存在；請使用新的工作目錄建置，避免混入舊檔。');
+const files=['index.html','entry.js','data-recovery.html','data-recovery.js','sw.js','manifest.json','icons/icon-192.png','icons/icon-512.png'];
+await mkdir(path.join(out,'icons'),{recursive:true});
+for(const file of files)await copyFile(path.join(root,file),path.join(out,file));
+await writeFile(path.join(out,'.nojekyll'),'');
+console.log('Pages artifact contains only the personal-app entry, recovery tool and icons.');

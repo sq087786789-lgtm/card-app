@@ -10,6 +10,7 @@ Thumbs.db
 
 # Logs
 *.log
+_site/
 
 # 工作目錄用的東西（不入 repo）
 inbox/
