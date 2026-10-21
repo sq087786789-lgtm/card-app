@@ -2,14 +2,32 @@
   "scriptId": "19h1ewm68Fdoj2E2iPWLV9WKlWoi8smwlvSe-UJfQRkW2gYRXCZeVQHCm",
   "editorUrl": "https://script.google.com/home/projects/19h1ewm68Fdoj2E2iPWLV9WKlWoi8smwlvSe-UJfQRkW2gYRXCZeVQHCm/edit",
   "ownerEmail": "sq087786789@gmail.com",
-  "status": "deployed-in-verification",
-  "webAppVersion": 4,
+  "status": "deployed-personal",
+  "access": "MYSELF",
+  "authentication": "active-google-owner-only",
+  "webAppVersion": 5,
   "webAppUrl": "https://script.google.com/macros/s/AKfycbxW7uPyY5JyhaTZHYGPrg9z_OKdDaNAPYlXqPADlS95al-1PKyuP5YZZ7JS_2XW91qU/exec",
   "driveFolderId": "1YdYASlIb7gF7wMZUHMDUe4emqalJPcrN",
   "databaseId": "1XYOy1zWAILKHmgQKVvalL5u1gfE1MYMVSh5-LUejb8I",
-  "verified": ["owner-initialization", "private-drive-folder", "private-sheet", "web-login-page", "owner-google-login", "card-write-readback", "backend-photo-save-readback", "app-photo-display", "fictional-card-gemini-ocr-save"],
+  "verified": [
+    "owner-initialization",
+    "private-drive-folder",
+    "private-sheet",
+    "owner-google-login",
+    "card-write-readback",
+    "backend-photo-save-readback",
+    "app-photo-display",
+    "fictional-card-gemini-ocr-save",
+    "personal-direct-entry-fresh-tab",
+    "personal-existing-card-photo-display",
+    "personal-card-write-readback",
+    "platform-owner-only"
+  ],
   "ocrProjectId": "gen-lang-client-0257505168",
   "ocrModel": "gemini-3.5-flash-lite",
   "ocrUsage": "fictional-test-cards-only",
-  "pending": ["browser-photo-picker", "cross-account", "iphone"]
+  "pending": [
+    "iphone-camera-heic",
+    "iphone-multiple-google-accounts"
+  ]
 }
