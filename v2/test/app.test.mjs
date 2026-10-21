@@ -108,3 +108,34 @@ test('standalone build preserves dollar identifiers and produces self-contained 
     assert.ok(script.includes('const $=s=>document.querySelector(s), $$='));assert.ok(!script.includes("import('./demo.js')"));assert.doesNotThrow(()=>new Script('(async()=>{'+script+'\n})()'));
   }finally{await rm(dir,{recursive:true,force:true});}
 });
+test('health endpoint is public without exposing identity or credentials',async t=>{
+  const a=await fixture(t);const health=await a.call('/health');assert.equal(health.status,200);assert.deepEqual(health.data,{ok:true,service:'shared-card-library',mode:'shared'});assert.equal((await a.call('/api/cards')).status,401);
+});
+test('Railway production refuses an ephemeral filesystem',async()=>{
+  await assert.rejects(createApp({demo:false,env:{APP_ORIGIN:'https://cards.example.test',OWNER_EMAIL:'owner@example.com',GOOGLE_CLIENT_ID:'client',GOOGLE_CLIENT_SECRET:'secret',TOKEN_ENCRYPTION_KEY:'ab'.repeat(32),RAILWAY_ENVIRONMENT_ID:'production'}}),/持久磁碟/);
+});
+test('staff save queues Drive upload; failures preserve data and can be retried by owner',async t=>{
+  let failing=true,uploadAttempts=0;
+  const mock=async(url,init={})=>{
+    url=String(url);
+    if(url.includes('/upload/')){uploadAttempts++;return {ok:!failing,status:failing?503:200,json:async()=>({id:'drive-photo'})};}
+    return {ok:true,json:async()=>{
+      if(url.includes('/token'))return {access_token:'access',refresh_token:'refresh-private-token',scope:'openid email https://www.googleapis.com/auth/drive.file'};
+      if(url.includes('/userinfo'))return {sub:'google-owner',email:'owner@example.com',email_verified:true};
+      if(url.includes('/drive/v3/files')&&init.method==='POST')return {id:'drive-folder'};
+      if(url.includes('/drive/v3/files'))return {files:[]};
+      throw new Error('Unexpected URL');
+    }};
+  };
+  const a=await fixture(t,{fetch:mock});const owner=a.addSession('owner@example.com','owner'),staff=a.addSession('staff@example.com');
+  const start=await a.call('/auth/google?purpose=drive',{headers:owner});const state=new URL(start.headers.get('location')).searchParams.get('state');
+  assert.equal((await a.call('/auth/callback?state='+state+'&code=test',{headers:{Cookie:owner.Cookie+'; card-oauth='+state}})).status,302);
+  await a.call('/api/drive/sync',{method:'POST',headers:owner,body:{}});
+  const photo=await a.call('/api/photos',{method:'POST',headers:staff,body:{dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6nL8AAAAASUVORK5CYII='}});
+  const saved=await a.call('/api/cards',{method:'POST',headers:staff,body:{name:'同步失敗仍保留',photoIds:[photo.data.id]}});assert.equal(saved.status,201);
+  let status;
+  for(let i=0;i<40;i++){status=(await a.call('/api/bootstrap',{headers:owner})).data;if(status.driveError)break;await new Promise(r=>setTimeout(r,5));}
+  assert.match(status.driveError,/503/);assert.equal(status.pendingPhotos,1);assert.equal(a.store.get(saved.data.id).name,'同步失敗仍保留');
+  failing=false;const retry=await a.call('/api/drive/sync',{method:'POST',headers:owner,body:{}});assert.equal(retry.data.count,1);
+  const latest=(await a.call('/api/bootstrap',{headers:owner})).data;assert.equal(latest.driveError,'');assert.equal(latest.pendingPhotos,0);assert.ok(latest.driveLastSync);assert.equal(uploadAttempts,2);
+});

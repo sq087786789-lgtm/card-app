@@ -24,13 +24,15 @@ npm run demo
 
 手機／電腦 → HTTPS Node.js 服務 → SQLite 共用資料庫（包含照片暫存）
 
-管理員個人 Gmail Drive ← 管理員授權後，按「同步待上傳照片」保存照片
+管理員個人 Gmail Drive ← 管理員授權後，儲存名片即自動同步照片
 
 圖片辨識：伺服器 → Gemini API → 欄位草稿 → 人工確認
 
 所有同事的照片都由同一個管理員 Drive 授權存入管理員的「公司名片庫」資料夾，員工不需知道管理員密碼或登入其 Google 帳號。以 drive.file 權限管理 App 建立的檔案，預設不設公開連結。員工經 App 的已授權 API 讀取照片。
 
-這版 Drive 是**照片保存副本**，不是文字資料庫，也不是自動的完整資料備份；先保存於伺服器的照片可在授權後重試同步。手動同步採檔案 appProperties 去重，避免網路中斷後重傳相同照片。名片照片同步不會自動刪除 Drive 的檔案。管理員應定期下載完整 JSON 備份，以及備份伺服器 data/（含加密後的 Drive 授權）。
+這版 Drive 是**照片保存副本**，不是文字資料庫，也不是自動的完整資料備份。連接後，儲存名片會排入同步，每分鐘也會重試；管理員可在「連線與備份」查看待同步張數、上次成功時間、錯誤並手動重試。同步採檔案 appProperties 去重，避免網路中斷後重傳相同照片；失敗時照片仍保留於伺服器。名片照片同步不會自動刪除 Drive 的檔案。管理員應定期下載完整 JSON 備份，以及備份伺服器 data/（含加密後的 Drive 授權）。
+
+iPhone 可以直接拍照，或從相簿選取 JPG、PNG、WebP、HEIC／HEIF（原圖上限 20MB）。瀏覽器會先縮至最長邊 2400 像素並轉成 JPEG；HEIC 需要可解碼的瀏覽器，例如 Safari 17 以上。辨識服務啟用後，加入照片會自動辨識；結果仍須對照原圖確認，再儲存名片。
 
 ## 啟用正式模式
 
@@ -43,13 +45,21 @@ npm run demo
 5. 在本機產生 32-byte 加密金鑰（hex 64 字元），填 TOKEN_ENCRYPTION_KEY；保管這把金鑰，遺失會無法解密既有 Drive 授權。不要在聊天中提供密鑰。
 6. 選用：設定 GEMINI_API_KEY 與該 Google 專案可用的 GEMINI_MODEL。未設定時辨識按鈕會顯示未啟用，照片仍可儲存。辨識會把正反面照片送至 Google Gemini，應依組織需求確認服務費用與資料處理條款。
 7. 將 DATA_DIR 指向持久磁碟（預設 ./data）。執行 `npm start`，反向代理只轉送到此服務並終結 HTTPS。正式模式不接受缺少安全設定的啟動。
-8. 管理員登入 →「成員與權限」核准員工 Google Email →「連線與備份」連接管理員 Google Drive → 同步待上傳照片。
+8. 管理員登入 →「成員與權限」核准員工 Google Email →「連線與備份」連接管理員 Google Drive。既有待上傳照片與之後儲存的名片照片會自動同步；可按「重試／同步待上傳照片」手動重試。
 9. 用管理員及員工兩個真實帳號測試登入、照片讀取、修改衝突、停用、備份還原，再用 10–20 張實際名片檢查各欄位辨識正確率，通過後才作為正式共用名片庫。
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 npm start
 ```
+
+### Railway 部署
+
+保留儲存庫根目錄作為建置 context，設定服務的 Railway Config File 為 `/v2/railway.json`，使用 `v2/Dockerfile`。不要使用根目錄舊版 railway.json 或將服務 Root Directory 改成 v2；Dockerfile 會從根目錄複製 v2 原始碼。
+
+掛載持久 Volume 到 `/app/data`，設定 `DATA_DIR=/app/data`、上述正式環境變數及正確的 HTTPS `APP_ORIGIN`；PORT 由主機注入。不要另設舊版 start command。容器啟動時只調整資料目錄擁有者，隨即以 uid/gid 1000 執行服務。Railway 沒有掛載 Volume 時，程式會拒絕啟動，避免重新部署遺失名片。服務限單一 replica，健康檢查為不含帳號或憑證的 `GET /health`。
+
+首次部署後仍需實測登入、Drive、辨識和重新部署後的資料保留。免費額度、帳務及 Google OAuth 測試／發布狀態須另行確認；程式通過測試不代表雲端服務已開通。
 
 Google 官方參考：
 - OAuth Web Server：https://developers.google.com/identity/protocols/oauth2/web-server

@@ -12,7 +12,8 @@ export async function createApp(options={}) {
   const origin=env.APP_ORIGIN || 'http://localhost:8787';
   const secure=new URL(origin).protocol==='https:';
   if(!demo && (!secure || !env.OWNER_EMAIL || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !/^[a-f\d]{64}$/i.test(env.TOKEN_ENCRYPTION_KEY||''))) throw new Error('正式模式需要 HTTPS APP_ORIGIN、OWNER_EMAIL、Google OAuth 憑證及 64 位十六進位 TOKEN_ENCRYPTION_KEY。請參閱 README。');
-  const dir=resolve(here,env.DATA_DIR || 'data'); await mkdir(dir,{recursive:true});
+  if(!demo && env.RAILWAY_ENVIRONMENT_ID && !env.RAILWAY_VOLUME_MOUNT_PATH) throw new Error('正式 Railway 服務必須先掛載持久磁碟，避免重新部署時遺失名片。');
+  const dir=resolve(here,env.DATA_DIR || env.RAILWAY_VOLUME_MOUNT_PATH || 'data'); await mkdir(dir,{recursive:true});
   const store=options.store || new Store(resolve(dir,demo?'demo.sqlite':'cards.sqlite'));
   const owner=(env.OWNER_EMAIL || 'demo@local.test').toLowerCase();
   store.db.prepare("INSERT INTO members(email,role,active) VALUES(?,'owner',1) ON CONFLICT(email) DO UPDATE SET role='owner',active=1").run(owner);
@@ -50,8 +51,18 @@ export async function createApp(options={}) {
     }
     return {count,pending:0};
   }
-  let syncing=null;
-  const synchronize=()=>{if(!syncing) syncing=syncDrive().finally(()=>{syncing=null;});return syncing;};
+  let syncing=null,syncAgain=false;
+  const synchronize=()=>{
+    syncAgain=true;
+    if(!syncing) syncing=(async()=>{
+      let count=0;
+      do {syncAgain=false;const result=await syncDrive();count+=result.count;} while(syncAgain);
+      store.setting('drive.error','');store.setting('drive.lastSync',new Date().toISOString());
+      return {count,pending:0};
+    })().catch(e=>{store.setting('drive.error',e.message);throw e;}).finally(()=>{syncing=null;});
+    return syncing;
+  };
+  const queueSync=()=>{if(!demo && store.setting('drive.refresh')) void synchronize().catch(()=>{});};
   async function handle(req,res) {
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('Cache-Control','no-store');
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
@@ -64,6 +75,7 @@ export async function createApp(options={}) {
     const requireUser=()=>{if(!session) fail(401,'請先使用已核准的 Google 帳號登入。');};
     const admin=()=>{requireUser();if(session.role!=='owner') fail(403,'這項操作需要管理員權限。');};
     try {
+      if(path==='/health' && method==='GET') return json({ok:true,service:'shared-card-library',mode:demo?'local-demo':'shared'});
       if(path.startsWith('/api/') && !['GET','HEAD'].includes(method)) { requireUser();if(req.headers['x-csrf-token']!==session.csrf) fail(403,'操作已過期，請重新整理。');if(req.headers.origin && req.headers.origin!==origin) fail(403,'來源不符。');hit(session.email+':writes',120,60000); }
       if(path==='/auth/google') {
         if(!oauthReady) fail(503,'尚未設定 Google 登入。');hit(req.socket.remoteAddress+':auth',20,60000);
@@ -79,17 +91,17 @@ export async function createApp(options={}) {
         const tokens=await google('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,redirect_uri:callback,grant_type:'authorization_code',code:url.searchParams.get('code'),code_verifier:flow.verifier})});
         const profile=await google('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tokens.access_token}});
         const email=(profile.email||'').toLowerCase();if(!profile.sub || profile.email_verified!==true) fail(403,'Google 帳號尚未驗證 Email。');
-        if(flow.purpose==='drive') { admin();if(flow.session_id!==sid || email!==owner) fail(403,'請使用管理員的 Google 帳號連接公司雲端。');if(!tokens.refresh_token) fail(400,'未取得離線授權，請重新連接 Drive。');if(!(tokens.scope||'').split(' ').includes('https://www.googleapis.com/auth/drive.file')) fail(403,'尚未同意 Drive 檔案存取權限。');store.setting('drive.refresh',enc(tokens.refresh_token));store.setting('drive.email',email);return redirect('/?connected=drive'); }
+        if(flow.purpose==='drive') { admin();if(flow.session_id!==sid || email!==owner) fail(403,'請使用管理員的 Google 帳號連接公司雲端。');if(!tokens.refresh_token) fail(400,'未取得離線授權，請重新連接 Drive。');if(!(tokens.scope||'').split(' ').includes('https://www.googleapis.com/auth/drive.file')) fail(403,'尚未同意 Drive 檔案存取權限。');store.setting('drive.refresh',enc(tokens.refresh_token));store.setting('drive.email',email);queueSync();return redirect('/?connected=drive'); }
         const member=store.db.prepare('SELECT * FROM members WHERE email=? AND active=1').get(email);if(!member) fail(403,'此帳號尚未由管理員核准，請聯絡管理員。');
         if(sid) store.db.prepare('DELETE FROM sessions WHERE id=?').run(sid);sid=random();store.db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(sid,email,random(),Date.now()+7*86400000);res.setHeader('Set-Cookie',cookie(cookieName,sid,7*86400));return redirect('/');
       }
-      if(path==='/api/bootstrap' && method==='GET') return json({mode:demo?'local-demo':'shared',user:session?{email:session.email,role:session.role}:null,csrf:session?.csrf,googleReady:oauthReady,ocrReady:!!(env.GEMINI_API_KEY && env.GEMINI_MODEL),driveConnected:!!store.setting('drive.refresh'),pendingPhotos:session?store.db.prepare('SELECT COUNT(*) n FROM photos WHERE card_id IS NOT NULL AND drive_id IS NULL').get().n:0});
+      if(path==='/api/bootstrap' && method==='GET') return json({mode:demo?'local-demo':'shared',user:session?{email:session.email,role:session.role}:null,csrf:session?.csrf,googleReady:oauthReady,ocrReady:!!(env.GEMINI_API_KEY && env.GEMINI_MODEL),driveConnected:!!store.setting('drive.refresh'),driveLastSync:session?store.setting('drive.lastSync')||null:null,driveError:session?store.setting('drive.error')||'':'',pendingPhotos:session?store.db.prepare('SELECT COUNT(*) n FROM photos WHERE card_id IS NOT NULL AND drive_id IS NULL').get().n:0});
       if(path.startsWith('/api/')) requireUser();
       if(path==='/api/logout' && method==='POST') {store.db.prepare('DELETE FROM sessions WHERE id=?').run(sid);res.setHeader('Set-Cookie',cookie(cookieName,'',0));return json({ok:true});}
       if(path==='/api/cards' && method==='GET') {if(url.searchParams.get('trash')) admin();return json(store.list(!!url.searchParams.get('trash')));}
-      if(path==='/api/cards' && method==='POST') {const input=await body(req);return json(store.save(input,session.email,null,input.allowDuplicate===true),201);}
+      if(path==='/api/cards' && method==='POST') {const input=await body(req);const saved=store.save(input,session.email,null,input.allowDuplicate===true);queueSync();return json(saved,201);}
       const card=path.match(/^\/api\/cards\/([\w-]+)$/);
-      if(card && method==='PUT') {const input=await body(req);return json(store.save(input,session.email,card[1],input.allowDuplicate===true));}
+      if(card && method==='PUT') {const input=await body(req);const saved=store.save(input,session.email,card[1],input.allowDuplicate===true);queueSync();return json(saved);}
       if(card && method==='DELETE') {admin();const input=await body(req);store.trash(card[1],input.revision,session.email);return json({ok:true});}
       const restore=path.match(/^\/api\/cards\/([\w-]+)\/restore$/);
       if(restore && method==='POST') {admin();const input=await body(req);store.trash(restore[1],input.revision,session.email,true);return json({ok:true});}
@@ -121,6 +133,8 @@ export async function createApp(options={}) {
     } catch(e) {const status=e.status || (e.name==='TimeoutError'?504:500);json({error:status===500?'服務暫時無法完成操作，資料未被丟棄。':e.message,...(e.duplicates?{duplicates:e.duplicates}:{})},status);}
   }
   const server=http.createServer((req,res)=>handle(req,res).catch(()=>{if(!res.headersSent) res.writeHead(500);res.end();}));
+  const syncTimer=!demo?setInterval(queueSync,60000):null;
+  syncTimer?.unref();server.on('close',()=>{if(syncTimer)clearInterval(syncTimer);});
   server.requestTimeout=60000;
   return {server,store,demo};
 }
