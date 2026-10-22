@@ -1,45 +1,32 @@
-# 我的名片：Google 個人版
+# Google 私人名片庫：部署與接手
 
-此版只供 sq087786789@gmail.com 本人使用，沿用既有私人 Drive 資料夾與 Sheets，不搬移或刪除現有名片。正常 Google 本人工作階段可直接開啟；多帳號瀏覽器改用既有 Google OAuth 憑證明確選帳號。只有經 Google 驗證的 sq087786789@gmail.com 能建立本人登入。
+正式 App：https://sq087786789-lgtm.github.io/card-app/library.html
+管理員：sq087786789@gmail.com
+Google 後端：Apps Script 第 10 版，部署 ID AKfycbxW7uPyY5JyhaTZHYGPrg9z_OKdDaNAPYlXqPADlS95al-1PKyuP5YZZ7JS_2XW91qU。
 
-## 建置與驗證
+## 登入方式與資料邊界
 
-node google/test.mjs
-node google/build.mjs
+一般 Chrome 的多帳號 Cookie 會讓 Google /exec 先 302 到 /macros/u/1/，再 404，App 根本不執行。2026-10-22 已改成 GitHub 前端以 credentials:omit、text/plain 簡單 POST 存取 Google ContentService 後端；實測能完成 Google 選帳號、同頁驗證並讀到 6 張原名片。
 
-建置使用 google/build-personal.mjs，沿用 v2 的拍照、裁切、欄位校正與備份程式，產生忽略於 Git 的 google/Index.html。建置同時合併 Code.gs 與 Login.gs 為忽略於 Git 的 Deploy.gs；將 Deploy.gs 放入線上「程式碼.gs」，並部署 Index.html、appsscript.json。不可同時部署 Deploy.gs 與兩個原始後端檔案，以免重複宣告。
+登入空殼與 API 入口設為「所有人」，但 doPost 的資料 API 必須帶有效 personalSession token；它不接受 Google 執行身分或空 token 作替代。Google 直接介面仍可供既有本人 Google 工作階段使用；正式推薦 GitHub App 網址。
 
-## 必須維持的存取設定
+Google OAuth 使用既有 Script Properties 的 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET，只要求 openid email。回呼固定為 https://sq087786789-lgtm.github.io/card-app/oauth-callback.html；保留 Google 舊 /exec 回呼以便回復。Google Console 已儲存新 URI。回呼先清除網址中的 code，只傳給固定 Google 後端；Google token 不傳回瀏覽器。
 
-Apps Script Web App 執行身分為管理員，新的登入修正需在使用者明確同意後，將登入空殼設為「所有人（包含未登入者）」，以避開 Google 平台多帳號入口；原名片 API 不可公開。未完成部署驗證前，不可聲稱已修復。後端另外在 doGet 與每一項 API 檢查 Session.getActiveUser().getEmail() 精確等於固定本人帳號；空身分或別人的帳號一律拒絕，不使用 execute-as-owner 的 EffectiveUser 當作訪客，也不接受舊共用版 session token。新登入使用 personalFlow／personalSession 獨立命名，經 Google authorization code + PKCE 與 userinfo 驗證本人後才發登入工作階段；其他帳號或未驗證 Email 一律拒絕。成員管理 API 關閉。
+state 5 分鐘單次、PKCE verifier 留伺服器、poll 另需 secret。userinfo 必須有 sub、email_verified=true、email 精確等於本人，才能核發 personalSession；不查成員名單、不接受原共用版 session。每個資料 API 再查 token 與期限，7 天硬到期。前端 token 和短暫 flow secret 只存在目前分頁 sessionStorage。其他／空 Email、偽造、過期、重放的登入一律拒絕。原 Sheets、Drive 和照片不搬移、不公開。
 
-GOOGLE_CLIENT_ID 與 GOOGLE_CLIENT_SECRET 沿用原有私人設定以提供登入備援，僅要求 openid email。GEMINI_API_KEY、GEMINI_MODEL 保留但不使用。辨識使用僅限 Cloud Vision API 的 VISION_API_KEY，開關 VISION_ENABLED=true；只保存在 Script Properties。DATABASE_ID、FOLDER_ID 沿用，不得放機密進程式碼或文件。原本四項 Google 資料權限不擴大。
+## 建置與發布
 
-## 簡化與載入優化
+1. `node google/test.mjs`：23 項測試。
+2. `node google/build.mjs`：產生 Index.html 及 Deploy.gs（Code.gs + Login.gs），兩者忽略於 Git。
+3. 線上「程式碼.gs」使用 Deploy.gs 全文，線上 Index.html 使用 Index.html 全文；不要同時放入合併檔和兩份來源檔。
+4. 更新原部署的新版本，執行身分為管理員、入口為所有人。不得將 ScriptApp OAuth token 或密鑰放前端。
+5. `node google/build-web.mjs` 另產生 Library.html；Pages 工作流程把它發布為 library.html，並發布 oauth-callback.html / oauth-callback.js。
+6. Github 和 Apps Script 分開部署，任何一方更新都不代表另一方已更新。
 
-- 首頁只顯示拍名片、搜尋及名片清單；備份／匯入與回收筒放入「更多」。
-- bootstrap 一次回傳身分、設定與名片，不再先登入再額外讀一次清單。
-- 同一次請求只開啟並讀取 Sheets 一次，寫入後同步更新該次請求的記憶體資料，鎖內完成 flush 再釋放。
-- 儲存名片時直接回傳最新清單，前端不再多送一次讀取；單人使用取消每 30 秒輪詢。
-- 文字先顯示；只有接近可視範圍的照片才讀取，最多兩張並行。編輯時先顯示欄位，再載入照片。
-- 不在瀏覽器永久儲存名片或憑證；既有 Google Drive 圖片仍維持私人。
+資料庫及照片 ID 沿用私人 Script Properties；不要重跑建立新資料庫的程式或清除既有設定。VISION_API_KEY / VISION_ENABLED 沿用；不啟用 Gemini、不改帳務。統編 taxId 是選填 8 位數文字，保留前導 0；支援編輯、搜尋、備份及有標示的 OCR 擷取，不檢驗稅籍。
 
-16 項隔離測試包含：其他或空 Google 身分拒絕、舊 token 無法繞過、一次 Sheets 讀取、儲存與操作紀錄一致、照片檔頭驗證、版本衝突、台灣電話去重、可復原回收筒、Vision 空結果／錯誤處理、持久用量預扣與上限、相同照片快取、台灣欄位整理，以及個人版沒有第二次登入、沒有輪詢、照片延遲載入。
+## 驗收與限制
 
-## 辨識與實機驗收界線
+23 項 Google 測試包含：原本人 Google 身分、新 OAuth 本人、其他帳號拒絕、API 無 token 拒絕、回呼重放、PKCE、過期、session 登出撤銷、無 Cookie 傳輸、Sheets 效能、統編與 Vision 用量保護。v2 共用元件及 Pages 遷移測試亦通過 CI。一般 Chrome 完整登入及既有名片讀取已實測；iPhone 相機／HEIC 仍需實機確認。不可聲稱所有瀏覽器均已測試。
 
-辨識已改為 card-library-sq087-20261021 專案的 Cloud Vision，使用者明確同意按辨識時處理真實名片。照片上傳後不自動辨識，不再出現虛構名片勾選框。只送 Google Vision，不回退免費 Gemini。既有帳務為 Google Cloud 免費試用帳戶，未升級付費；Vision 每月前 1,000 圖片單位免費。App 限制任意連續 32 天 900 張，達上限停止，單張成功結果按內容快取。這只控制此 App，不能保證同帳務其他使用量為零。完整設定與界線見 VISION.md。
-
-Cloud Vision 真實 API 整合驗證成功：虛構照片讀出王小明、測試公司、0900-000-001、demo@example.com；保存與讀回成功；相同圖片再次辨識用量維持 1，剩餘 899。測試名片已移至可還原回收筒，暫時驗證函式已移除。個人版直接登入、私人照片及原資料保留。iPhone 拍照／HEIC 與多 Google 帳號仍需實機驗收，不承諾秒開或未量測的速度倍數。
-
-## 回復
-
-個人版切換前的共用版 GitHub 版本為 8b345aadbfc08216f1f94008a6c6b0a0ab223fcf，Apps Script 第 4 版。回復共用版前須重新確認要開放的帳號與權限，不能只把平台入口擴大後略過後端身分驗證。
-
-## 統編欄位
-
-新增選填的 8 位數統編（taxId），以文字保存前導 0，支援新增、編輯、搜尋、JSON 備份及 vCard 自訂欄位 X-TAX-ID。OCR 只從有「統編／統一編號／Tax ID」標示的文字擷取，仍需人工核對；不驗證稅籍或登記狀態。舊名片沒有此欄位時顯示空白，不需資料搬移。
-
-## 多帳號登入修正
-
-Google 平台要求登入的入口在一般 Chrome 可重現 /macros/u/1/ 的 Drive「無法開啟檔案」，無痕單一帳號可用。修正提供不含資料的登入空殼及本人 OAuth 備援，不擴大資料讀取者。回呼固定原 /exec 網址；state 單次、5 分鐘到期；PKCE verifier 只在伺服器；輪詢另驗證 secret，成功只交付一次。Google access token 不回傳瀏覽器。App token 以 hash 索引保存在 Script Properties，7 天硬到期，前端只存目前分頁 sessionStorage；關閉該分頁或過期可能須再選帳號。原有 Google 直接身分檢查保留。
+回復時可選第 7 版並還原對應 Git，但會恢復 Google 直接入口的多帳號錯誤；需同步評估前端、登入設定與原資料，不能將資料 API 改成未驗證可讀。

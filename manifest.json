@@ -2,7 +2,7 @@
   "name": "我的名片｜Google 個人版",
   "short_name": "我的名片",
   "description": "開啟私人 Google 名片庫，拍照辨識與搜尋聯絡資訊",
-  "start_url": "./index.html",
+  "start_url": "./library.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

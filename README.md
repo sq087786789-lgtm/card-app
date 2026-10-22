@@ -1,29 +1,29 @@
-# 我的名片：Google 個人版
+# 我的名片：Google 私人名片庫
 
-[開啟名片網站](https://sq087786789-lgtm.github.io/card-app/) · [直接進入私人名片庫](https://script.google.com/macros/s/AKfycbxW7uPyY5JyhaTZHYGPrg9z_OKdDaNAPYlXqPADlS95al-1PKyuP5YZZ7JS_2XW91qU/exec)
+[開啟名片 App](https://sq087786789-lgtm.github.io/card-app/library.html) · [原網站入口](https://sq087786789-lgtm.github.io/card-app/) · [舊裝置資料匯出](https://sq087786789-lgtm.github.io/card-app/data-recovery.html)
 
-目前使用 Google Apps Script 第 6 版，僅供管理員本人使用。Google 直接登入；Sheets 保存名片欄位，私人 Drive 保存正反面照片，Cloud Vision 讀取文字。使用方式：拍照或選圖 → 按辨識 → 核對欄位 → 儲存。
+僅供 sq087786789@gmail.com 本人使用。操作介面由 GitHub Pages 提供，Google Apps Script 第 10 版處理登入驗證、名片與照片；私人 Sheets 保存欄位、私人 Drive 保存照片，Cloud Vision 辨識文字。支援統編、正反面照片、搜尋、JSON 備份及 vCard 匯出。
 
-GitHub Pages 提供新版入口；私人資料與辨識 API 在 Google 執行，不在公開網站存放。完整 App 程式在 [google/](google/README.md)，憑證只在私人 Script Properties，沒有提交 GitHub。程式碼變更仍須另外部署 Apps Script，合併 GitHub 不會自動修改 Google 後端。
+## 登入修正（2026-10-22）
 
-## 舊版撤下與資料保留
+已在原本失敗的一般 Chrome 完成 Google 選帳號、驗證、同分頁回到 App，成功讀取 6 張既有名片。直接導覽 Google /exec 仍可能被多帳號 Cookie 轉到 /macros/u/1/ 後回傳 404，因此正式使用上方 GitHub App 網址。前端對後端的簡單 POST 一律 credentials:omit，不帶 Google 多帳號 Cookie；任何讀取或寫入都需要新的本人登入 token。
 
-舊版名片介面、人工 OCR 腳本、舊伺服器及公開 cards.json／images 已從目前版本撤下。舊 Git 版本可回復，沒有清除 Git 歷史。
+OAuth 沿用既有私人憑證，只要求 openid email。Google 授權碼回呼固定為 https://sq087786789-lgtm.github.io/card-app/oauth-callback.html；立即清除網址中的授權碼，再交由 Google 後端驗證。後端精確核對 Google 已驗證的本人 Email；其他帳號、過期或偽造 token 不能讀取名片或照片。原共用版 session 不適用。
 
-原手機瀏覽器的 IndexedDB 名片不會被刪除。若尚未搬移，請在原手機開啟 [舊資料匯出](https://sq087786789-lgtm.github.io/card-app/data-recovery.html)，下載 JSON，再到 Google 版「更多 → 備份與匯入」匯入。匯出工具只讀本機資料及本 App 圖片快取，不上傳、同步或呼叫 OCR。沒有快取的舊網址照片需重新補上。
+App 登入 token 只存目前分頁 sessionStorage，伺服器用 hash 索引且 7 天硬到期；關閉分頁、過期或瀏覽器清除儲存空間可能需要再選帳號。密鑰、Google access token、名片資料與照片均不提交公開 GitHub。
 
-sw.js 撤換舊快取優先程式，只刷新此名片網站，不清除 IndexedDB 或照片快取，也不影響同帳號的裝車助手等其他工具。舊手機主畫面圖示若仍顯示舊頁，連網重新開啟後會更新。
+## 部署與維護
 
-## 辨識及用量
+- `node google/test.mjs`：23 項本人存取、OAuth、PKCE、回呼重放、無 Cookie 傳輸、統編、照片與 Vision 測試。
+- `node scripts/check-pages.mjs`：6 項舊資料唯讀匯出及 Service Worker 更新範圍測試。
+- `node google/build-web.mjs`：由共用前端生成忽略於 Git 的 Google/網頁介面及後端合併檔，詳見 [Google 部署說明](google/README.md)。
+- Google 正式更新：把 google/Deploy.gs 放到線上「程式碼.gs」，google/Index.html 放到線上 Index.html，建立新版本並更新原部署。GitHub 合併不會自動更新 Google 後端。
+- GitHub Pages 由 .github/workflows/pages.yml 建置，只發布介面、登入回呼、舊資料匯出頁、更新腳本與圖示；不發布後端原始碼、憑證或私人資料。
 
-Cloud Vision 的獨立金鑰只允許此 API，不回退 Gemini。App 採 900 張圖片／滾動 32 天上限，先持久預扣，失敗不自動重試；相同照片重用結果。此上限只管本 App，不涵蓋帳務內其他使用。沒有升級現有 Google Cloud 免費試用帳戶。詳見 [Vision 設定及驗證](google/VISION.md)。
+## 舊資料保留與辨識
 
-## 維護與驗證
+舊介面、舊伺服器及公開 cards.json／images 已從目前版本撤下，沒有清除 Git 歷史。本機 IndexedDB 和照片快取保留，可在原裝置匯出後匯入新版；沒有快取的照片需重新補上。Service Worker 不刪除資料，也不影響同帳號其他工具。
 
-- `node google/test.mjs`：Google 個人版及 Vision 行為測試。
-- `node scripts/check-pages.mjs`：舊資料唯讀匯出與 Service Worker 更新範圍。
-- `node google/build.mjs`：由 v2/public 的共用介面元件建置 google/Index.html；此產物不進 Git。
-- v2/ 保留為建置來源及歷史實作，沒有新版網站入口。GitHub Pages 由 .github/workflows/pages.yml 發布；scripts/build-pages.mjs 僅打包入口、唯讀匯出頁、更新腳本與圖示，不發布 google/、v2/ 或資料檔。_config.yml 另保留分支發布時的排除設定。
-- iPhone 相機／HEIC 及多 Google 帳號仍需實機驗收。不要將私人聯絡資料、照片備份或金鑰提交公開儲存庫。
+Cloud Vision 只在按辨識時處理照片，不使用 Gemini。App 設有 900 張圖片／滾動 32 天上限、持久預扣及相同照片快取；帳務內其他服務用量另計。沒有升級 Google Cloud 免費試用帳戶。詳見 [Vision 說明](google/VISION.md)。iPhone 拍照／HEIC 仍需實機驗收。
 
 MIT
