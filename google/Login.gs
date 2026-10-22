@@ -1,6 +1,6 @@
 // Owner-only OAuth fallback for browsers whose Google multi-login routing fails.
 // Credentials stay in Script Properties; no Google tokens reach the browser.
-const PERSONAL_CALLBACK_='https://script.google.com/macros/s/AKfycbxW7uPyY5JyhaTZHYGPrg9z_OKdDaNAPYlXqPADlS95al-1PKyuP5YZZ7JS_2XW91qU/exec';
+const PERSONAL_CALLBACK_='https://sq087786789-lgtm.github.io/card-app/oauth-callback.html';
 function beginPersonalLogin(){return safe_(()=>locked_(()=>{
   rate_('personal-login',20);const p=props_();
   for(const [k,v] of Object.entries(p.getProperties()))if(/^(personalFlow|personalSession)\./.test(k)){try{if(JSON.parse(v).expires<=Date.now())p.deleteProperty(k);}catch{p.deleteProperty(k);}}

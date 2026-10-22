@@ -38,7 +38,7 @@ test('OAuth has PKCE, a fixed callback and email-only scopes; polling requires a
  const a=loginFixture(),f=a.flow(),url=new URL(f.url),stored=JSON.parse(a.p.get('personalFlow.'+f.flow));
  assert.equal(url.origin,'https://accounts.google.com');assert.equal(url.searchParams.get('scope'),'openid email');
  assert.equal(url.searchParams.get('code_challenge'),a.ctx.hash_(stored.verifier));assert.equal(url.searchParams.get('code_challenge_method'),'S256');
- assert.equal(url.searchParams.get('redirect_uri'),'https://script.google.com/macros/s/AKfycbxW7uPyY5JyhaTZHYGPrg9z_OKdDaNAPYlXqPADlS95al-1PKyuP5YZZ7JS_2XW91qU/exec');
+ assert.equal(url.searchParams.get('redirect_uri'),'https://sq087786789-lgtm.github.io/card-app/oauth-callback.html');
  assert.equal(url.searchParams.has('client_secret'),false);assert.equal(a.ctx.pollPersonalLogin(f.flow,'wrong-secret').status,403);assert.equal(a.stats.reads,0);
 });
 test('only verified owner OAuth can issue a new session; legacy tokens stay invalid',()=>{
@@ -92,6 +92,6 @@ test('GitHub frontend uses cookie-free simple POST; callback clears the URL and 
  const html=await readFile(new URL('./Library.html',import.meta.url),'utf8'),callback=await readFile(new URL('../oauth-callback.js',import.meta.url),'utf8');
  assert.ok(html.includes('const personalRemote=true;'));assert.ok(html.includes("credentials:'omit'"));assert.ok(html.includes("'Content-Type':'text/plain;charset=UTF-8'"));
  assert.ok(!html.includes('GOOGLE_CLIENT_SECRET'));assert.ok(!html.includes('VISION_API_KEY'));
- assert.ok(callback.includes('history.replaceState'));assert.ok(callback.includes("credentials:'omit'"));assert.ok(!callback.includes('sessionStorage'));
+ assert.ok(callback.includes('history.replaceState'));assert.ok(callback.includes("credentials:'omit'"));assert.ok(callback.includes('card-personal-pending-v1'));assert.ok(!callback.includes('card-personal-session-v1'));assert.ok(callback.includes("location.replace('./library.html')"));
  new Script(callback);
 });

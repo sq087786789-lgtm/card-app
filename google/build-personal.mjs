@@ -15,7 +15,7 @@ replace(/await updatePhoto\(\);\$\('#editor'\)\.showModal\(\);/,`$('#editor').sh
 // Single-user data is refreshed after mutations or on demand, without a background polling loop.
 app=app.split('\n').filter(line=>!line.startsWith('setInterval(()=>{if(boot?.mode')).join('\n');
 const bootStart=app.lastIndexOf("try{boot=await api('/api/bootstrap')");if(bootStart<0)throw Error('Bootstrap changed');
-app=app.slice(0,bootStart)+`$('#loginRetry').onclick=()=>startPersonal();await startPersonal();
+app=app.slice(0,bootStart)+`$('#loginRetry').onclick=()=>{clearPendingPersonalLogin();startPersonal();};await startPersonal();
 $('#personalCamera').onclick=()=>{openEditor();$('#cameraFile').click();};$('#personalRefresh').onclick=async()=>{photoCache.clear();try{await reload();toast('已更新');}catch(e){notice($('#pageError'),e.message,'error');}};
 `;
 const driveStart=app.indexOf("    if(boot.mode==='shared'&&boot.user.role==='owner'){");
