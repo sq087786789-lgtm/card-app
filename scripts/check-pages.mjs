@@ -2,6 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createContext,runInContext,Script} from 'node:vm';
+test('main entry redirects without waiting for the worker; recovery stays open',async()=>{
+ const code=await readFile(new URL('../entry.js',import.meta.url),'utf8');
+ const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+ const recoveryHtml=await readFile(new URL('../data-recovery.html',import.meta.url),'utf8');
+ assert.ok(html.includes('data-app-entry="redirect"'));
+ assert.ok(!recoveryHtml.includes('data-app-entry="redirect"'));
+ const target=html.match(/id="open-library" href="([^"]+)"/)[1];
+ for(const mode of ['redirect',undefined]){
+  const navigations=[];
+  runInContext(code,createContext({document:{documentElement:{dataset:{appEntry:mode}},getElementById:()=>({href:target})},location:{replace:url=>navigations.push(url)},navigator:{serviceWorker:{register:()=>new Promise(()=>{})}}}));
+  assert.deepEqual(navigations,mode==='redirect'?[target]:[]);
+ }
+});
 const recovery=await readFile(new URL('../data-recovery.js',import.meta.url),'utf8');
 function fixture(indexedDB){const button={},status={};const ctx=createContext({indexedDB,Blob,URL,location:{href:'https://example.github.io/card-app/data-recovery.html'},window:{},document:{querySelector:selector=>selector==='#export'?button:status}});runInContext(recovery,ctx);return ctx;}
 test('absent legacy database aborts creation and returns no cards',async()=>{let aborted=false;const ctx=fixture({open:name=>{assert.equal(name,'card-app');const request={transaction:{abort:()=>{aborted=true;queueMicrotask(()=>request.onerror());}}};queueMicrotask(()=>request.onupgradeneeded());return request;}});assert.equal((await runInContext('oldCards()',ctx)).length,0);assert.equal(aborted,true);});
