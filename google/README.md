@@ -11,7 +11,7 @@ node google/build.mjs
 
 ## 必須維持的存取設定
 
-Apps Script Web App 執行身分為管理員，誰可以存取必須選「只有我自己」。後端另外在 doGet 與每一項 API 檢查 Session.getActiveUser().getEmail() 精確等於固定本人帳號；空身分或別人的帳號一律拒絕，不使用 execute-as-owner 的 EffectiveUser 當作訪客，也不接受舊自訂 session token 作為替代。成員管理 API 關閉。
+Apps Script Web App 執行身分為管理員，登入入口目前依使用者授權設為「所有已登入 Google 帳戶的使用者」，僅為測試多帳號瀏覽器的開啟問題；不代表其他帳號可讀取名片，一般 Chrome 多帳號仍有開啟錯誤。後端另外在 doGet 與每一項 API 檢查 Session.getActiveUser().getEmail() 精確等於固定本人帳號；空身分或別人的帳號一律拒絕，不使用 execute-as-owner 的 EffectiveUser 當作訪客，也不接受舊自訂 session token 作為替代。成員管理 API 關閉。
 
 GOOGLE_CLIENT_ID、GOOGLE_CLIENT_SECRET、GEMINI_API_KEY、GEMINI_MODEL 等先前設定保留以便回復，目前不再使用。辨識使用僅限 Cloud Vision API 的 VISION_API_KEY，開關 VISION_ENABLED=true；只保存在 Script Properties。DATABASE_ID、FOLDER_ID 沿用，不得放機密進程式碼或文件。原本四項 Google 資料權限不擴大。
 
@@ -35,3 +35,7 @@ Cloud Vision 真實 API 整合驗證成功：虛構照片讀出王小明、測�
 ## 回復
 
 個人版切換前的共用版 GitHub 版本為 8b345aadbfc08216f1f94008a6c6b0a0ab223fcf，Apps Script 第 4 版。回復共用版前須重新確認要開放的帳號與權限，不能只把平台入口擴大後略過後端身分驗證。
+
+## 統編欄位
+
+新增選填的 8 位數統編（taxId），以文字保存前導 0，支援新增、編輯、搜尋、JSON 備份及 vCard 自訂欄位 X-TAX-ID。OCR 只從有「統編／統一編號／Tax ID」標示的文字擷取，仍需人工核對；不驗證稅籍或登記狀態。舊名片沒有此欄位時顯示空白，不需資料搬移。

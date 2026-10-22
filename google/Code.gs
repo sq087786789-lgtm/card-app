@@ -1,6 +1,6 @@
 /** All private helpers end in _ so google.script.run cannot invoke them. */
 const OWNER_ = 'sq087786789@gmail.com';
-const FIELDS_ = ['name','company','title','mobile','phone','extension','fax','email','website','line','address','category','note','rawText'];
+const FIELDS_ = ['name','company','taxId','title','mobile','phone','extension','fax','email','website','line','address','category','note','rawText'];
 function props_(){return PropertiesService.getScriptProperties();}
 function id_(){return Utilities.getUuid()+Utilities.getUuid();}
 function hash_(s){return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,s)).replace(/=+$/,'');}
@@ -46,7 +46,7 @@ function read_(s,path){
   if(path==='/api/backup'){admin_(s);return {format:'shared-card-library',version:2,cards:list_('card'),photos:list_('photo').filter(p=>p.cardId).map(p=>({id:p.id,dataUrl:photoData_(p.id)})),exportedAt:new Date().toISOString()};}
   const photo=path.match(/^\/api\/photos\/([\w-]+)$/);if(photo)return photoData_(photo[1]);fail_(404,'找不到這項資料。');
 }
-function clean_(v){const c={};FIELDS_.forEach(k=>c[k]=typeof v[k]==='string'?v[k].trim().slice(0,['note','rawText'].includes(k)?12000:500):'');if(!['未分類','客戶','供應商','合作夥伴','其他'].includes(c.category))c.category='未分類';c.reviewed=v.reviewed===true;if(![c.name,c.company,c.phone,c.mobile,c.email].some(Boolean))fail_(400,'請至少填寫姓名、公司、電話或 Email。');if(c.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email))fail_(400,'Email 格式不正確。');if(c.website){if(!/^https?:\/\//i.test(c.website))c.website='https://'+c.website;if(!/^https?:\/\/[^\s/?#:@]+\.[^\s/?#:@]+(?::\d+)?(?:[/?#][^\s]*)?$/i.test(c.website))fail_(400,'網站網址格式不正確。');}return c;}
+function clean_(v){const c={};FIELDS_.forEach(k=>c[k]=typeof v[k]==='string'?v[k].trim().slice(0,['note','rawText'].includes(k)?12000:500):'');if(!['未分類','客戶','供應商','合作夥伴','其他'].includes(c.category))c.category='未分類';c.taxId=c.taxId.normalize('NFKC').replace(/[\s-]/g,'');if(c.taxId&&!/^\d{8}$/.test(c.taxId))fail_(400,'統編請填寫 8 位數字。');c.reviewed=v.reviewed===true;if(![c.name,c.company,c.phone,c.mobile,c.email].some(Boolean))fail_(400,'請至少填寫姓名、公司、電話或 Email。');if(c.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email))fail_(400,'Email 格式不正確。');if(c.website){if(!/^https?:\/\//i.test(c.website))c.website='https://'+c.website;if(!/^https?:\/\/[^\s/?#:@]+\.[^\s/?#:@]+(?::\d+)?(?:[/?#][^\s]*)?$/i.test(c.website))fail_(400,'網站網址格式不正確。');}return c;}
 function save_(s,input,id){
   const old=id?get_('card',id):null;if(id&&(!old||old.deletedAt))fail_(404,'找不到名片。');if(old&&old.revision!==input.revision)fail_(409,'另一位同事已修改名片，請重新開啟。');const c=clean_(input),digits=v=>String(v||'').replace(/\D/g,'').replace(/^8860?/,'0');const phone=[c.phone,c.mobile].map(digits).filter(Boolean);
   const dup=list_('card').filter(x=>x.id!==id&&!x.deletedAt&&((c.email&&c.email.toLowerCase()===String(x.email||'').toLowerCase())||[x.phone,x.mobile].map(digits).some(v=>v&&phone.includes(v))));if(dup.length&&!input.allowDuplicate)fail_(409,'找到相同電話或 Email。',{duplicates:dup.map(x=>({id:x.id,name:x.name,company:x.company}))});
@@ -98,6 +98,7 @@ function visionFields_(text){
   const company=/(?:股份有限公司|有限公司|企業社|工作室|實業社|商行|證券|銀行|事務所|協會|基金會|診所|醫院|大學|科技公司|測試公司)/;
   const title=/(?:總經理|副總經理|董事長|董事|經理|副理|襄理|主任|專員|工程師|設計師|業務|執行長|負責人|Manager|Director|Engineer|Sales|CEO)/i;
   for(const line of lines){
+    const tax=line.match(/(?:統一編號|統編|統一編碼|Tax\s*(?:ID|No\.?)|VAT\s*(?:ID|No\.?))\s*[:：#]?\s*((?:\d[ -]*){8})(?!\d)/i);if(tax)set('taxId',tax[1].replace(/\D/g,''),true);
     for(const value of line.match(email)||[])set('email',value);
     const web=line.replace(email,'').match(/(?:https?:\/\/|www\.)[a-z0-9][a-z0-9./_?=&%#~+-]*|\b(?:[a-z0-9-]+\.)+(?:com|tw|net|org|io)(?:\/[a-z0-9./_?=&%#~+-]*)?/ig);for(const value of web||[])set('website',value.replace(/[.,;]+$/,''));
     const ext=line.match(/(?:分機|ext\.?|#)\s*[:：]?\s*(\d{1,6})/i);if(ext)set('extension',ext[1]);

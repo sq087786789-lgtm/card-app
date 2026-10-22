@@ -1,9 +1,11 @@
-export const fields = ['name','company','title','mobile','phone','extension','fax','email','website','line','address','category','note','rawText'];
+export const fields = ['name','company','taxId','title','mobile','phone','extension','fax','email','website','line','address','category','note','rawText'];
 export const categories = ['未分類','客戶','供應商','合作夥伴','其他'];
 export function cleanCard(input) {
   const out = {};
   for (const k of fields) out[k] = typeof input[k] === 'string' ? input[k].trim().slice(0, k === 'rawText' || k === 'note' ? 12000 : 500) : '';
   if (!categories.includes(out.category)) out.category = '未分類';
+  out.taxId = out.taxId.normalize('NFKC').replace(/[\s-]/g,'');
+  if (out.taxId && !/^\d{8}$/.test(out.taxId)) throw new Error('統編請填寫 8 位數字。');
   out.reviewed = input.reviewed === true;
   if (!out.name && !out.company && !out.phone && !out.mobile && !out.email) throw new Error('至少填寫姓名、公司、電話或 Email 其中一項。');
   if (out.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(out.email)) throw new Error('Email 格式不正確，請確認。');
@@ -20,7 +22,7 @@ export function duplicateCards(card, cards) {
 }
 export function vcf(cards) {
   const esc = s => (s || '').replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/;/g,'\\;').replace(/,/g,'\\,');
-  return cards.map(c => ['BEGIN:VCARD','VERSION:3.0','FN:'+esc(c.name || c.company),'N:'+esc(c.name)+';;;;',c.company && 'ORG:'+esc(c.company),c.title && 'TITLE:'+esc(c.title),c.mobile && 'TEL;TYPE=CELL:'+esc(c.mobile),c.phone && 'TEL;TYPE=WORK:'+esc(c.phone)+(c.extension ? ';ext='+esc(c.extension) : ''),c.fax && 'TEL;TYPE=FAX:'+esc(c.fax),c.email && 'EMAIL:'+esc(c.email),c.website && 'URL:'+esc(c.website),c.address && 'ADR;TYPE=WORK:;;'+esc(c.address)+';;;;',c.note && 'NOTE:'+esc(c.note),'END:VCARD'].filter(Boolean).join('\r\n')).join('\r\n');
+  return cards.map(c => ['BEGIN:VCARD','VERSION:3.0','FN:'+esc(c.name || c.company),'N:'+esc(c.name)+';;;;',c.company && 'ORG:'+esc(c.company),c.taxId && 'X-TAX-ID:'+esc(c.taxId),c.title && 'TITLE:'+esc(c.title),c.mobile && 'TEL;TYPE=CELL:'+esc(c.mobile),c.phone && 'TEL;TYPE=WORK:'+esc(c.phone)+(c.extension ? ';ext='+esc(c.extension) : ''),c.fax && 'TEL;TYPE=FAX:'+esc(c.fax),c.email && 'EMAIL:'+esc(c.email),c.website && 'URL:'+esc(c.website),c.address && 'ADR;TYPE=WORK:;;'+esc(c.address)+';;;;',c.note && 'NOTE:'+esc(c.note),'END:VCARD'].filter(Boolean).join('\r\n')).join('\r\n');
 }
 export function parseVCF(text) {
   const unfolded = text.replace(/\r?\n[ \t]/g,'');
@@ -32,6 +34,7 @@ export function parseVCF(text) {
       const key = line.slice(0,i).toUpperCase(); const val = unesc(line.slice(i+1));
       if (key === 'FN') c.name = val;
       if (key === 'ORG') c.company = val;
+      if (key === 'X-TAX-ID') c.taxId = val;
       if (key === 'TITLE') c.title = val;
       if (key.startsWith('TEL')) c[/FAX/.test(key) ? 'fax' : /CELL/.test(key) ? 'mobile' : 'phone'] = val;
       if (key.startsWith('EMAIL')) c.email = val;
