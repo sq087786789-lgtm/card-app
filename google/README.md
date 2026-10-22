@@ -1,19 +1,19 @@
 # 我的名片：Google 個人版
 
-此版只供 sq087786789@gmail.com 本人使用，沿用既有私人 Drive 資料夾與 Sheets，不搬移或刪除現有名片。Google 負責登入，App 不再建立第二組登入流程或保存登入 token。
+此版只供 sq087786789@gmail.com 本人使用，沿用既有私人 Drive 資料夾與 Sheets，不搬移或刪除現有名片。正常 Google 本人工作階段可直接開啟；多帳號瀏覽器改用既有 Google OAuth 憑證明確選帳號。只有經 Google 驗證的 sq087786789@gmail.com 能建立本人登入。
 
 ## 建置與驗證
 
 node google/test.mjs
 node google/build.mjs
 
-建置使用 google/build-personal.mjs，沿用 v2 的拍照、裁切、欄位校正與備份程式，產生忽略於 Git 的 google/Index.html。部署 Code.gs、Index.html、appsscript.json。
+建置使用 google/build-personal.mjs，沿用 v2 的拍照、裁切、欄位校正與備份程式，產生忽略於 Git 的 google/Index.html。建置同時合併 Code.gs 與 Login.gs 為忽略於 Git 的 Deploy.gs；將 Deploy.gs 放入線上「程式碼.gs」，並部署 Index.html、appsscript.json。不可同時部署 Deploy.gs 與兩個原始後端檔案，以免重複宣告。
 
 ## 必須維持的存取設定
 
-Apps Script Web App 執行身分為管理員，登入入口目前依使用者授權設為「所有已登入 Google 帳戶的使用者」，僅為測試多帳號瀏覽器的開啟問題；不代表其他帳號可讀取名片，一般 Chrome 多帳號仍有開啟錯誤。後端另外在 doGet 與每一項 API 檢查 Session.getActiveUser().getEmail() 精確等於固定本人帳號；空身分或別人的帳號一律拒絕，不使用 execute-as-owner 的 EffectiveUser 當作訪客，也不接受舊自訂 session token 作為替代。成員管理 API 關閉。
+Apps Script Web App 執行身分為管理員，新的登入修正需在使用者明確同意後，將登入空殼設為「所有人（包含未登入者）」，以避開 Google 平台多帳號入口；原名片 API 不可公開。未完成部署驗證前，不可聲稱已修復。後端另外在 doGet 與每一項 API 檢查 Session.getActiveUser().getEmail() 精確等於固定本人帳號；空身分或別人的帳號一律拒絕，不使用 execute-as-owner 的 EffectiveUser 當作訪客，也不接受舊共用版 session token。新登入使用 personalFlow／personalSession 獨立命名，經 Google authorization code + PKCE 與 userinfo 驗證本人後才發登入工作階段；其他帳號或未驗證 Email 一律拒絕。成員管理 API 關閉。
 
-GOOGLE_CLIENT_ID、GOOGLE_CLIENT_SECRET、GEMINI_API_KEY、GEMINI_MODEL 等先前設定保留以便回復，目前不再使用。辨識使用僅限 Cloud Vision API 的 VISION_API_KEY，開關 VISION_ENABLED=true；只保存在 Script Properties。DATABASE_ID、FOLDER_ID 沿用，不得放機密進程式碼或文件。原本四項 Google 資料權限不擴大。
+GOOGLE_CLIENT_ID 與 GOOGLE_CLIENT_SECRET 沿用原有私人設定以提供登入備援，僅要求 openid email。GEMINI_API_KEY、GEMINI_MODEL 保留但不使用。辨識使用僅限 Cloud Vision API 的 VISION_API_KEY，開關 VISION_ENABLED=true；只保存在 Script Properties。DATABASE_ID、FOLDER_ID 沿用，不得放機密進程式碼或文件。原本四項 Google 資料權限不擴大。
 
 ## 簡化與載入優化
 
@@ -39,3 +39,7 @@ Cloud Vision 真實 API 整合驗證成功：虛構照片讀出王小明、測�
 ## 統編欄位
 
 新增選填的 8 位數統編（taxId），以文字保存前導 0，支援新增、編輯、搜尋、JSON 備份及 vCard 自訂欄位 X-TAX-ID。OCR 只從有「統編／統一編號／Tax ID」標示的文字擷取，仍需人工核對；不驗證稅籍或登記狀態。舊名片沒有此欄位時顯示空白，不需資料搬移。
+
+## 多帳號登入修正
+
+Google 平台要求登入的入口在一般 Chrome 可重現 /macros/u/1/ 的 Drive「無法開啟檔案」，無痕單一帳號可用。修正提供不含資料的登入空殼及本人 OAuth 備援，不擴大資料讀取者。回呼固定原 /exec 網址；state 單次、5 分鐘到期；PKCE verifier 只在伺服器；輪詢另驗證 secret，成功只交付一次。Google access token 不回傳瀏覽器。App token 以 hash 索引保存在 Script Properties，7 天硬到期，前端只存目前分頁 sessionStorage；關閉該分頁或過期可能須再選帳號。原有 Google 直接身分檢查保留。

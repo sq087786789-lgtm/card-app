@@ -13,7 +13,15 @@ function list_(type){return rows_().filter(r=>r.type===type).map(r=>Object.assig
 function get_(type,id){return list_(type).find(r=>r.id===id)||null;}
 function member_(email){return get_('member',email.toLowerCase());}
 function audit_(actor,action,card){put_('audit',Utilities.getUuid(),{actor:actor,action:action,card_id:card||null,at:new Date().toISOString()});}
-function session_(){const email=String(Session.getActiveUser().getEmail()||'').toLowerCase();if(email!==OWNER_)fail_(403,'這是私人名片庫，請使用 '+OWNER_+' 開啟。');return {email:email,role:'owner'};}
+function session_(token){
+  if(token){
+    if(typeof token!=='string'||token.length>100)fail_(403,'請重新登入。');
+    let saved;try{saved=JSON.parse(props_().getProperty('personalSession.'+hash_(token))||'null');}catch{}
+    if(!saved||saved.email!==OWNER_||!saved.sub||typeof saved.expires!=='number'||!Number.isFinite(saved.expires)||saved.expires<=Date.now())fail_(403,'登入已過期，請重新登入。');
+    return {email:OWNER_,role:'owner'};
+  }
+  const email=String(Session.getActiveUser().getEmail()||'').toLowerCase();if(email!==OWNER_)fail_(403,'這是私人名片庫，請使用 '+OWNER_+' 開啟。');return {email:email,role:'owner'};
+}
 function admin_(s){if(s.role!=='owner')fail_(403,'這項操作需要管理員權限。');}
 function purge_(){const p=props_();Object.entries(p.getProperties()).forEach(([k,v])=>{if(/^(flow|session)\./.test(k)){try{if(JSON.parse(v).expires<Date.now())p.deleteProperty(k);}catch{p.deleteProperty(k);}}});}
 function rate_(key,max){const c=CacheService.getScriptCache(),k='rate.'+hash_(key+':'+Math.floor(Date.now()/60000));const n=Number(c.get(k)||0)+1;if(n>max)fail_(429,'操作太頻繁，請稍後再試。');c.put(k,String(n),70);}
@@ -28,15 +36,41 @@ function setup_(){
     if(!p.getProperty('DATABASE_ID')){const ss=SpreadsheetApp.create('公司名片庫－共用資料');p.setProperty('DATABASE_ID',ss.getId());ss.getSheets()[0].appendRow(['type','id','json']);Drive.Files.update({},ss.getId(),null,{addParents:folder,removeParents:'root'});}
     put_('member',OWNER_,{email:OWNER_,role:'owner',active:true});return {initialized:true};});
 }
-function doGet(){try{session_();}catch{return HtmlService.createHtmlOutput('<meta name="viewport" content="width=device-width"><p>請使用 sq087786789@gmail.com 開啟此私人名片庫。</p>').setTitle('私人名片庫');}return HtmlService.createHtmlOutputFromFile('Index').setTitle('我的名片').addMetaTag('viewport','width=device-width,initial-scale=1');}
+function doGet(e){
+  if(e&&e.parameter&&(e.parameter.code||e.parameter.error)){
+    let message='登入已處理，請關閉這個分頁並回到原本的名片 App。';
+    try{completePersonalLogin_(e.parameter);}catch{message='登入未完成，請回到名片 App 重新登入。';}
+    return HtmlService.createHtmlOutput('<meta name="viewport" content="width=device-width"><p>'+message+'</p>').setTitle('名片登入');
+  }
+  // The shell has no private data. Every data API still verifies the owner.
+  return HtmlService.createHtmlOutputFromFile('Index').setTitle('我的名片').addMetaTag('viewport','width=device-width,initial-scale=1');
+}
 function safe_(fn){try{return {ok:true,data:fn()};}catch(e){return {ok:false,status:e.status||500,error:e.status?e.message:'服務暫時無法完成操作，請稍後重試。',...(e.extra||{})};}}
+// Cross-origin requests omit Google account cookies; no private API works without
+// a verified personal session token. Never use EffectiveUser as the caller.
+function doPost(e){
+  const result=safe_(()=>{
+    const body=e&&e.postData&&e.postData.contents;if(typeof body!=='string'||body.length>12*1024*1024)fail_(400,'要求格式不正確。');
+    let q;try{q=JSON.parse(body);}catch{fail_(400,'要求格式不正確。');}
+    if(!q||typeof q!=='object')fail_(400,'要求格式不正確。');
+    if(q.action==='beginLogin')return beginPersonalLogin();
+    if(q.action==='pollLogin')return pollPersonalLogin(q.flow,q.secret);
+    if(q.action==='completeLogin'){completePersonalLogin_({state:q.state,code:q.code,error:q.error});return {ok:true,data:{completed:true}};}
+    if(q.action==='api'){
+      if(typeof q.token!=='string'||!q.token)fail_(403,'請先登入。');
+      return api(q.token,q.path,q.method,q.input);
+    }
+    fail_(404,'不支援這項要求。');
+  });
+  return ContentService.createTextOutput(JSON.stringify(result.ok?result.data:result)).setMimeType(ContentService.MimeType.JSON);
+}
 function api(token,path,method,input){requestStore_=null;return safe_(()=>{
-  const s=session_();
+  const s=session_(token);
   method=method||'GET';input=input||{};if(typeof path!=='string'||path.length>180||JSON.stringify(input).length>12*1024*1024)fail_(400,'要求格式不正確或照片過大。');
   if(path==='/api/bootstrap'&&method==='GET'){const p=props_();return {mode:'shared',deployment:'google-personal',user:s,googleReady:true,ocrReady:visionReady_(),driveConnected:!!p.getProperty('FOLDER_ID'),driveFolderUrl:'https://drive.google.com/drive/folders/'+p.getProperty('FOLDER_ID'),ocrProvider:'Cloud Vision',ocrUsage:visionUsage_(),pendingPhotos:0,initialCards:read_(s,'/api/cards')};}
   rate_(s.email,120);if(method==='GET')return read_(s,path);
   if(path==='/api/ocr'&&method==='POST')return ocr_(s,input);
-  return locked_(()=>{session_();const result=write_(s,path,method,input,token);if(path.startsWith('/api/cards'))result.initialCards=read_(s,'/api/cards');return result;});
+  return locked_(()=>{session_(token);const result=write_(s,path,method,input,token);if(path.startsWith('/api/cards'))result.initialCards=read_(s,'/api/cards');return result;});
 });}
 function read_(s,path){
   if(path==='/api/cards')return list_('card').filter(c=>!c.deletedAt).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
@@ -54,7 +88,7 @@ function save_(s,input,id){
   const now=new Date().toISOString();id=id||Utilities.getUuid();const result={...c,id:id,photoIds:photos,revision:(old?.revision||0)+1,createdAt:old?.createdAt||now,updatedAt:now,updatedBy:s.email,deletedAt:null};put_('card',id,result);photos.forEach(pid=>put_('photo',pid,{...get_('photo',pid),cardId:id}));audit_(s.email,old?'修改名片':'新增名片',id);return result;
 }
 function write_(s,path,method,v,token){
-  if(path==='/api/logout')fail_(405,'私人版直接使用你的 Google 登入狀態。');
+  if(path==='/api/logout'){if(token)props_().deleteProperty('personalSession.'+hash_(token));return {ok:true};}
   if(path==='/api/cards'&&method==='POST')return save_(s,v);
   const c=path.match(/^\/api\/cards\/([\w-]+)(\/restore)?$/);if(c){if(method==='PUT'&&!c[2])return save_(s,v,c[1]);admin_(s);if(!((method==='DELETE'&&!c[2])||(method==='POST'&&c[2])))fail_(405,'不支援這項操作。');const old=get_('card',c[1]);if(!old||old.revision!==v.revision)fail_(409,'資料已更新，請重新整理。');put_('card',c[1],{...old,revision:old.revision+1,deletedAt:c[2]?null:new Date().toISOString()});audit_(s.email,c[2]?'還原名片':'移至回收筒',c[1]);return {ok:true};}
   if(path==='/api/members'&&method==='POST'){fail_(403,'個人版不開放新增成員。');admin_(s);const email=String(v.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email===OWNER_)fail_(400,'請輸入員工的 Google Email。');put_('member',email,{email:email,role:'staff',active:v.active!==false});audit_(s.email,(v.active===false?'停用員工 ':'核准員工 ')+email);return {ok:true};}
