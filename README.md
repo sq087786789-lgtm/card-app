@@ -4,7 +4,7 @@
 
 目前使用 Google Apps Script 第 6 版，僅供管理員本人使用。Google 直接登入；Sheets 保存名片欄位，私人 Drive 保存正反面照片，Cloud Vision 讀取文字。使用方式：拍照或選圖 → 按辨識 → 核對欄位 → 儲存。
 
-開啟 GitHub Pages 網址會自動進入 Google 名片主畫面，不需再按入口按鈕；舊資料匯出仍可從下方專用網址開啟。私人資料與辨識 API 在 Google 執行，不在公開網站存放。完整 App 程式在 [google/](google/README.md)，憑證只在私人 Script Properties，沒有提交 GitHub。程式碼變更仍須另外部署 Apps Script，合併 GitHub 不會自動修改 Google 後端。
+GitHub Pages 提供新版入口；私人資料與辨識 API 在 Google 執行，不在公開網站存放。完整 App 程式在 [google/](google/README.md)，憑證只在私人 Script Properties，沒有提交 GitHub。程式碼變更仍須另外部署 Apps Script，合併 GitHub 不會自動修改 Google 後端。
 
 ## 舊版撤下與資料保留
 
